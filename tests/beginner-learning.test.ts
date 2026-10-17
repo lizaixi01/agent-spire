@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BEGINNER_QUESTIONS, practiceQuestion } from "../src/beginner-content";
+import { BEGINNER_FOLLOW_UPS, BEGINNER_QUESTIONS, practiceQuestion } from "../src/beginner-content";
 import { LESSONS } from "../src/content";
 import { availableNodes, enterNode, answerQuiz, finishQuiz, answerLab } from "../src/engine";
 import { caseForBattle, transferFor, CASE_BY_ID } from "../src/learning-cases";
@@ -27,6 +27,26 @@ describe("零基础入门主线", () => {
     for (const l of LESSONS) expect(practiceQuestion(l.id).lessonId).toBe(l.id);
     expect(practiceQuestion("pass").question).not.toContain("概率");
     expect(practiceQuestion("agent").options[practiceQuestion("agent").correct]).toContain("读取文件");
+  });
+  it("后一关的题干和巩固题不能与更早关卡的题干相同", () => {
+    const seen = new Set<string>();
+    for (const q of BEGINNER_QUESTIONS) {
+      const transfer = transferFor(CASE_BY_ID[`beginner-${q.id}`]);
+      expect(seen.has(q.question), q.id).toBe(false);
+      expect(seen.has(transfer.question), `${q.id} 的巩固题重复了更早的题干`).toBe(false);
+      expect(transfer.question).not.toBe(q.question);
+      expect(transfer.evidence).toBeTruthy();
+      seen.add(q.question);
+    }
+    const followUps = Object.entries(BEGINNER_FOLLOW_UPS);
+    expect(new Set(followUps.map(([, q]) => q.question)).size).toBe(followUps.length);
+    for (const [parentId, q] of followUps) {
+      const parent = BEGINNER_QUESTIONS.find(item => item.id === parentId);
+      expect(parent?.lessonId).toBe(q.lessonId);
+      expect(BEGINNER_QUESTIONS.some(item => item.question === q.question || item.scene === q.scene)).toBe(false);
+      expect((q.scene + q.question).length).toBeLessThan(120);
+      expect(new Set(q.optionReasons).size).toBe(3);
+    }
   });
   it("新战斗、三步试炼与图鉴都接入入门内容，选项仍随机且可恢复", () => {
     for (let chapter=1;chapter<=10;chapter++) {
