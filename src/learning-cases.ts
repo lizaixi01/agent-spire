@@ -1,7 +1,7 @@
 import type { Run } from "./engine";
 import { LESSON_BY_ID } from "./content";
 import { ENGINEERING_TRIALS } from "./trial-bank";
-import { BEGINNER_QUESTIONS, practiceQuestion, type BeginnerQuestion } from "./beginner-content";
+import { BEGINNER_FOLLOW_UPS, BEGINNER_QUESTIONS, practiceQuestion, type BeginnerQuestion } from "./beginner-content";
 
 export interface LearningCase {
   id: string;
@@ -297,8 +297,15 @@ function beginnerTransfer(q: BeginnerQuestion): Transfer {
   return { question:q.question, evidence:q.scene, intro:q.intro, level:"beginner", hint:q.hint,
     code:"", options:q.options, correct:q.correct, explanation:q.explanation };
 }
+// The next scenario of the same idea. The old lookup always returned the first
+// sibling, so every later level repeated an earlier prompt instead of moving on.
+function nextBeginnerQuestion(q: BeginnerQuestion): BeginnerQuestion | undefined {
+  const same = BEGINNER_QUESTIONS.filter(other => other.lessonId === q.lessonId);
+  const index = same.findIndex(other => other.id === q.id);
+  return same[index + 1] ?? BEGINNER_FOLLOW_UPS[q.id];
+}
 for (const q of BEGINNER_QUESTIONS) {
-  const next = BEGINNER_QUESTIONS.find(other => other.lessonId === q.lessonId && other.id !== q.id);
+  const next = nextBeginnerQuestion(q);
   const lesson = LESSON_BY_ID[q.lessonId];
   const transfer = next ? beginnerTransfer(next) : {
     question:lesson.question, evidence:"用刚才的小知识，再做一次简单判断。", intro:q.intro, level:"beginner" as const,
