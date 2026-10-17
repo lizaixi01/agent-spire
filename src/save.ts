@@ -5,6 +5,7 @@ import { CARD_BY_ID, CHARACTERS, RELICS, type RelicId } from "./cards";
 import { LESSON_BY_ID, CHAPTER_COUNT } from "./content";
 import { CASE_BY_ID } from "./learning-cases";
 import { TRIAL_BY_ID, trialDefinition, trialReward, trialQuestion, trialScore } from "./trials";
+import { createBossState } from "./boss-mechanics";
 export const encodeRun = (run: Run): string => JSON.stringify(run);
 type Obj = Record<string, unknown>;
 const object = (v: unknown): v is Obj =>
@@ -33,6 +34,23 @@ const kinds = [
   "event",
   "treasure",
 ];
+function bossState(v: unknown, chapter: number): boolean {
+  if (!object(v) || v.kind !== createBossState(chapter)?.kind) return false;
+  const cardId = (id: unknown) => id === null || (str(id) && Object.hasOwn(CARD_BY_ID, id));
+  switch (v.kind) {
+    case "feedback": return typeof v.ready === "boolean";
+    case "window": return num(v.used);
+    case "retrieval": return array(v.known, id => id !== null && cardId(id)) && new Set(v.known as unknown[]).size === (v.known as unknown[]).length && typeof v.recalled === "boolean";
+    case "protocol": return num(v.step, 2);
+    case "recovery": return cardId(v.lastCard);
+    case "boundary": return true;
+    case "evaluation": return num(v.streak, 2) && typeof v.attacked === "boolean" && typeof v.defended === "boolean";
+    case "reward": return typeof v.claimed === "boolean" && num(v.debt);
+    case "evolution": return cardId(v.resisted) && cardId(v.candidate) && num(v.peak);
+    case "council": return ["coordinator", "actor", "auditor"].includes(String(v.role));
+    default: return false;
+  }
+}
 function valid(value: unknown): value is Run {
   if (
     !object(value) ||
@@ -61,6 +79,9 @@ function valid(value: unknown): value is Run {
   )
     return false;
   if (value.curriculumVersion !== undefined && value.curriculumVersion !== 2) return false;
+  if (value.preparation !== undefined && (!object(value.preparation) ||
+    Object.keys(value.preparation).some(k => !["ward", "review"].includes(k)) ||
+    [value.preparation.ward, value.preparation.review].some(v => v !== undefined && typeof v !== "boolean"))) return false;
   const p = value.player;
   if (p.resetCharges !== undefined && !num(p.resetCharges, 1)) return false;
   if (
@@ -161,6 +182,12 @@ function valid(value: unknown): value is Run {
       )
     )
       return false;
+    if (b.ward !== undefined && typeof b.ward !== "boolean") return false;
+    if (b.review !== undefined && !["pending", "passed", "failed"].includes(String(b.review))) return false;
+    const enemies = b.enemies as Obj[];
+    if (enemies.some(e => e.boss !== undefined && (value.curriculumVersion !== 2 || b.room !== "boss" || !bossState(e.boss, value.act as number)))) return false;
+    if (enemies.some(e => object(e.boss) && e.boss.kind === "council") &&
+      (enemies.length !== 3 || new Set(enemies.map(e => object(e.boss) ? e.boss.role : null)).size !== 3 || enemies.some(e => !object(e.boss) || e.boss.kind !== "council"))) return false;
     if (
       b.sequence !== undefined &&
       !array(b.sequence, (id) => str(id) && Object.hasOwn(CARD_BY_ID, id))

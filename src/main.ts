@@ -34,6 +34,7 @@ import {
   combatUnlocked,
   useReset,
   burstBonus,
+  takeBossBait,
   chooseReward,
   answerQuiz,
   finishQuiz,
@@ -58,6 +59,8 @@ import { synergyFor } from "./synergy";
 import { impactFor } from "./impact";
 import { installCardDrag } from "./card-input";
 import { MODELS, modelForCharacter, modelSprite, modelLogo } from "./models";
+import { BOSS_RULES, bossStatus } from "./boss-mechanics";
+import { eventView, eventRelicLabel } from "./chapter-events";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const SAVE_KEY = "agent-spire.run.v1";
@@ -314,7 +317,7 @@ function mapPage(): string {
       .join("")}<div class="map-start">选择亮起的下一层节点</div></div></div>
     <aside class="journey-panel"><div class="journal-heading"><h2>远征手记</h2>${icon("book", "", 23)}</div>
       <div class="traveler-card"><div class="traveler-portrait">${heroArt(CHARACTERS.find((c) => c.id === r.character)!.color, modelForCharacter(run!.character))}</div><div><h3>${CHARACTERS.find((c) => c.id === r.character)!.name}</h3><small>生命 ${r.player.hp} / ${r.player.maxHp}</small></div></div>
-      ${relicRow()}<div class="journal-section"><span class="section-number">${String(chapter).padStart(2,"0")}</span><div><span class="eyebrow">下一层学习章节</span><h3>${CHAPTERS[chapter-1]}</h3><p>第 ${chapter} 章 · 战斗决策与试炼对应本章</p></div></div>
+      ${relicRow()}${r.preparation ? `<p class="encounter-preparation">下一战准备：${r.preparation.ward ? "一次隔离保护 " : ""}${r.preparation.review ? "固定种子复测押注" : ""}</p>` : ""}<div class="journal-section"><span class="section-number">${String(chapter).padStart(2,"0")}</span><div><span class="eyebrow">下一层学习章节</span><h3>${CHAPTERS[chapter-1]}</h3><p>第 ${chapter} 章 · 战斗决策与试炼对应本章</p></div></div>
       <div class="chapter-list">${CHAPTERS.map((name, i) => ({
         name,
         n: i + 1,
@@ -351,6 +354,9 @@ function battlePage(): string {
   const b = r.battle!;
   const unlocked = combatUnlocked(r);
   const hero = CHARACTERS.find((c) => c.id === r.character)!;
+  const bossEnemy = b.enemies.find(e => e.boss);
+  const bossRule = bossEnemy?.boss ? BOSS_RULES[bossEnemy.boss.kind] : null;
+  const bait = b.enemies.find(e => e.hp > 0 && e.boss?.kind === "reward");
   const knowledge = LESSON_BY_ID[activeLessonId && LESSON_BY_ID[activeLessonId].chapter === r.act ? activeLessonId : caseForBattle(r).lesson];
   const currentTarget =
     b.enemies.find((e) => e.id === targetId && e.hp > 0) ??
@@ -370,6 +376,8 @@ function battlePage(): string {
         return `<button class="fighter enemy-fighter ${e.hp <= 0 ? "slain" : ""} ${e.id === targetId ? "targeted" : ""}" data-action="target" data-id="${e.id}" ${e.hp <= 0 ? "disabled" : ""} aria-label="选择目标 ${e.name}" title="点击选为攻击目标"><div class="enemy-intent ${intent.kind}" title="下回合：${intent.kind === "defend" ? "获得格挡" : intent.kind === "weaken" ? "对你施加虚弱" : "攻击"}">${icon(intentIcon, "", 20)}<b>${intent.value}</b><small>${intent.kind === "defend" ? "防御" : intent.kind === "weaken" ? "干扰" : intent.kind === "heavy" ? "重击" : "攻击"}</small></div>${enemyArt(e.art, e.id)}<b class="enemy-name">${e.name}</b>${e.trait ? `<span class="enemy-rule" title="${e.trait === "rage" ? "每次行动后，基础攻击永久增加 1。拖延会使后续攻击更危险。" : "每次行动后额外获得 4 点格挡。需要连携和集中攻击。"}">${e.trait === "rage" ? "蓄势 · 每回合攻击 +1" : "装甲 · 每回合格挡 +4"}</span>` : ""}<div class="health-bar enemy-health"><i style="width:${(e.hp / e.maxHp) * 100}%"></i><span>${e.hp} / ${e.maxHp}</span></div><div class="status-row">${e.block ? `<span>${icon("shield", "", 15)} ${e.block}</span>` : ""}${e.weak ? `<span>虚弱 ${e.weak}</span>` : ""}${e.vulnerable ? `<span>易伤 ${e.vulnerable}</span>` : ""}${e.poison ? `<span>侵蚀 ${e.poison}</span>` : ""}</div><span class="target-marker">${e.id === targetId ? "当前目标" : "点击选择"}</span></button>`;
       })
       .join("")}</div></div>
+    ${b.ward || b.review ? `<p class="encounter-preparation" role="status">${b.ward ? "隔离保护：下一次敌人攻击或反击被抵消。 " : ""}${b.review ? { pending: "固定种子复测：等待两步决策结果。", passed: "复测通过：额外 60 金币与 10 治疗已结算。", failed: "复测未通过：押注预算不返还。" }[b.review] : ""}</p>` : ""}
+    ${bossRule ? `<section class="boss-mechanic" aria-label="本章首领机制"><h3>${bossRule.name}<small>${sourceLabel(LESSON_BY_ID[bossRule.lesson])}</small></h3><p>${bossRule.text}</p><div class="boss-progress">${b.enemies.filter(e => e.boss).map(e => `<span>${e.name}：${e.hp > 0 ? bossStatus(e, b.turn) : "已击败"}</span>`).join("")}</div>${bait ? btn("boss-bait", "领取诱饵：+2 能量；首领回血 20、攻击永久 +3", "secondary-button", !unlocked || (bait.boss?.kind === "reward" && bait.boss.claimed) ? "disabled" : "") : ""}</section>` : ""}
     <div class="combat-ribbon combat-knowledge"><div><b>${knowledge.title}</b><p>${knowledge.concept}</p><small>§${knowledge.section} · 书内 p.${knowledge.page}</small></div>${btn("card-principle", "查看原理", "text-button")}</div>
     ${!unlocked ? `<div class="decision-gate" role="status">${icon("lock", "", 18)} 完成两步工程决策，解锁出牌 ${btn("focus-lab", "去作答", "text-button")}</div>` : ""}<div class="hand-zone"><button class="pile draw-pile" data-action="draw"><span class="pile-card">${icon("tower", "", 30)}</span><b>${b.drawPile.length}</b><small>抽牌堆</small></button><div class="energy-orb" title="每回合恢复能量，用来打出卡牌"><b>${r.player.energy}</b><span>/ ${r.player.maxEnergy + b.cache}</span><small>能量</small></div>
     <div class="hand ${b.hand.length > 6 ? "crowded" : ""}">${b.hand.map((card, i) => cardView(card, "play", i, !unlocked || statsFor(card).cost > r.player.energy)).join("")}${!b.hand.length ? '<p class="empty-hand">手牌已空，结束回合抽取新牌。</p>' : ""}</div>
@@ -385,8 +393,9 @@ function learningPanel(): string {
   const prompt = choice === null ? c.situation : second.question;
   const evidence = choice === null ? c.evidence : second.code ?? c.evidence;
   const hasCode = choice === null ? c.codeLanguage : second.codeLanguage ?? c.codeLanguage;
-  return `<details class="lab-panel ${verified ? "verified" : ""}" ${labExpanded ? "open" : ""}><summary>${icon(verified ? "check" : "code", "", 18)}<b>${verified ? "理解已验证" : complete ? "案例复盘" : "工程决策"}</b><span>${complete ? l.title : choice === null ? "1 / 2 · 选对 +1 能量" : hasCode ? "2 / 2 · 错因辨析" : "2 / 2 · 验证迁移"}</span></summary><div class="lab-body"><div class="lab-source"><b>${l.title}</b>${sourceLabel(c.source ?? l)}</div><p class="lab-situation">${esc(prompt)}</p>${hasCode ? `<pre class="lab-code"><code>${esc(evidence)}</code></pre><small class="lab-code-label">Python 3 · 工程练习</small>` : `<blockquote class="lab-evidence">${esc(evidence)}</blockquote>`}
-  ${choice !== null ? `<details class="lab-previous"><summary>上一步${choice === c.correct ? "判断正确 · 能量 +1 · 抽牌 +1" : "判断有误 · 虚弱 +1"}</summary><p>${esc(c.consequences[choice])}</p></details>` : ""}
+  return `<details class="lab-panel ${verified ? "verified" : ""}" ${labExpanded ? "open" : ""}><summary>${icon(verified ? "check" : "code", "", 18)}<b>${verified ? "理解已验证" : complete ? "案例复盘" : "工程决策"}</b><span>${complete ? l.title : choice === null ? "1 / 2 · 选对 +1 能量" : hasCode ? "2 / 2 · 错因辨析" : "2 / 2 · 验证迁移"}</span></summary><div class="lab-body"><div class="lab-source"><b>${l.title}</b>${sourceLabel(c.source ?? l)}</div>
+  ${choice !== null ? `<section class="lab-feedback ${choice === c.correct ? "correct" : "incorrect"}" role="status" aria-label="上一题解析"><h3>第 1 步 · ${choice === c.correct ? "判断正确 · 能量 +1 · 抽牌 +1" : "判断有误 · 虚弱 +1"}</h3><p class="feedback-question">${esc(c.situation)}</p><p><b>你的选择：${"ABC"[choice]}</b> ${esc(c.options[choice])}</p><p><b>${choice === c.correct ? "正确原因" : "错在这里"}：</b>${esc(c.consequences[choice])}</p>${choice !== c.correct ? `<p><b>正确选项：${"ABC"[c.correct]}</b> ${esc(c.options[c.correct])}</p><p><b>为什么正确：</b>${esc(c.consequences[c.correct])}</p>` : ""}</section>` : ""}
+  <p class="lab-situation">${esc(prompt)}</p>${hasCode ? `<pre class="lab-code"><code>${esc(evidence)}</code></pre><small class="lab-code-label">Python 3 · 工程练习</small>` : `<blockquote class="lab-evidence">${esc(evidence)}</blockquote>`}
   ${!complete ? `<div class="lab-options">${options.map((o,i)=>btn("lab-choice",`<span>${"ABC"[i]}</span>${esc(o)}`,"lab-choice",`data-index="${i}"`)).join("")}</div>` : `<p class="lab-result ${transfer === second.correct ? "correct" : "incorrect"}"><b>${transfer === second.correct ? "诊断验证正确" : "诊断验证有误"}</b>${esc(second.explanation)}</p><div class="lab-completion">${verified ? `${icon("seal", "", 24)}<b>掌握度 +1</b><span>格挡 +6 · 金币 +10</span>` : `<b>本次未获得掌握度</b><span>正确做法：${esc(c.options[c.correct])}；${esc(second.options[second.correct])}</span>`}</div>`}
   </div></details>`;
 }
@@ -432,8 +441,9 @@ function shopPage(): string {
   );
 }
 function eventPage(): string {
+  const view = eventView(run!);
   return roomFrame(
-    `${heading("", "遗落手稿")}<div class="event-sheet"><div class="room-emblem">${icon("book", "", 90)}</div><div class="event-choices">${btn("event-study", `<span>${icon("book")}<b>研读手稿</b><small>进入知识试炼</small></span>${icon("arrow", "", 18)}`, "event-choice")}${btn("event-risk", `<span>${icon("coin")}<b>触碰封印</b><small>失去 8 生命，获得 45 金币</small></span>${icon("arrow", "", 18)}`, "event-choice dangerous")}${btn("event-leave", "离开", "text-button")}</div></div>`,
+    `${heading("", view.title, sourceLabel(LESSON_BY_ID[view.lesson]))}<p class="event-story">${view.story}</p><div class="event-sheet"><div class="room-emblem">${icon("book", "", 90)}</div><div class="event-choices">${btn("event-study", `<span>${icon("book")}<b>${view.study}</b><small>进入本章知识试炼</small></span>${icon("arrow", "", 18)}`, "event-choice")}${view.targeted ? `<section class="event-contract"><h3>${view.risk}</h3><p>${view.effect}</p><small>${view.disabled || "点击下方一张牌执行此选择"}</small></section>` : btn("event-risk", `<span>${icon("coin")}<b>${view.risk}</b><small>${view.effect}${run!.act === 10 && view.relic ? ` 本次获得：${eventRelicLabel(run!)}` : ""}</small>${view.disabled ? `<em>${view.disabled}</em>` : ""}</span>${icon("arrow", "", 18)}`, "event-choice dangerous", view.disabled ? "disabled" : "")}${btn("event-leave", "离开", "text-button")}</div></div>${view.targeted ? `<div class="event-targets">${view.targets.map(c => cardView(c, "event-risk", 0, !!view.disabled)).join("")}</div>` : ""}`,
     "event-page",
   );
 }
@@ -881,17 +891,14 @@ app.addEventListener("click", (event) => {
     case "event-study":
     case "event-risk":
     case "event-leave":
-      if (run)
-        update(
-          resolveEvent(
-            run,
-            action === "event-study"
-              ? "study"
-              : action === "event-risk"
-                ? "risk"
-                : "leave",
-          ),
-        );
+      if (run) {
+        const view = eventView(run);
+        const next = resolveEvent(run, action === "event-study" ? "study" : action === "event-risk" ? "risk" : "leave", id);
+        if (next !== run) { update(next); if (action === "event-risk") flash(`${view.risk}：${view.effect}`); }
+      }
+      break;
+    case "boss-bait":
+      if (run) update(takeBossBait(run));
       break;
     case "chapter":
       chapterFilter = index;

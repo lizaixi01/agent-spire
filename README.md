@@ -22,7 +22,7 @@
 - **边构筑，边理解。** 73 张可升级卡牌、三种专属角色构筑，配合连携、遗物、药水、商店与篝火。
 - **用代码做决策。** 84 道 Python 工程题提供现场证据、候选行动和逐项解析；战斗中先判断行动，再完成迁移验证。
 - **逐章探索。** 从 ReAct、上下文工程、RAG、工具与 MCP，一路走到评估、后训练、持续进化和多 Agent 协作。知识图鉴保留章节与页码。
-- **一局一条路线。** 十章十幕、90 层、随机分支与章节首领；固定种子可以复现远征。
+- **一局一条路线。** 十章十幕、90 层；十种首领机制与章节事件围绕本章知识设计，从窗口预算、接口契约到连续验收和分工协作，固定种子可复现远征。
 - **打开就接着玩。** 自动本地存档、键盘与拖牌操作、移动布局，音乐与音效独立开关，支持减少动态效果。
 
 游戏完全在浏览器本地运行，不调用大模型，无需账号、API 密钥或后端服务。卡面由 SVG 绘制，音频由 Web Audio 合成。
@@ -31,7 +31,7 @@
 
 ### 只想游玩
 
-1. 从 [Releases](https://github.com/lizaixi01/agent-spire/releases/latest) 下载 **`agent-spire-v0.1.0-play.zip`**，解压整个文件夹。请选择 `-play.zip`；GitHub 自动生成的 Source code 是开发源码。
+1. 从 [Releases](https://github.com/lizaixi01/agent-spire/releases/latest) 下载 **`agent-spire-v0.1.1-play.zip`**，解压整个文件夹。请选择 `-play.zip`；GitHub 自动生成的 Source code 是开发源码。
 2. 安装 [Node.js](https://nodejs.org/) 22.12+，也兼容 20.19+。
 3. **Windows：**双击 `启动游戏.cmd`。**macOS / Linux：**在解压目录运行 `node scripts/serve-game.mjs`，打开 <http://127.0.0.1:4173/>。
 
@@ -39,7 +39,7 @@
 
 ### 下载有多轻
 
-当前 v0.1.0 游玩 ZIP 约 **7.25 MiB**，发布设置 **10 MiB 上限**。只打包游戏、三张使用中的图片、中文像素字体与许可、零依赖启动器；不附带 Node.js、`node_modules`、测试截图、教材 PDF 或停用素材。校验值见附件 `SHA256SUMS.txt`。
+当前 v0.1.1 游玩 ZIP 约 **7.26 MiB**，发布设置 **10 MiB 上限**。只打包游戏、三张使用中的图片、中文像素字体与许可、零依赖启动器；不附带 Node.js、`node_modules`、测试截图、教材 PDF 或停用素材。校验值见附件 `SHA256SUMS.txt`。
 
 源码仓库同样排除依赖、构建目录和历史素材。只需最新源码时：
 
@@ -65,7 +65,7 @@ git clone --depth 1 https://github.com/lizaixi01/agent-spire.git
 | 关闭面板 / 取消拖牌 | `Esc` |
 | 手机浏览手牌 | 左右滑动 |
 
-推荐桌面端游玩。工程决策的两步完成后解锁本场出牌；答错仍可继续，解析会解释原因。
+推荐桌面端游玩。工程决策的两步完成后解锁本场出牌；第一步作答后直接显示所选答案的原因，答错时同时给出正确选项及其依据，第二步和重载后保留解析。首领规则、进度与下次行动在战斗中公开。
 
 ![实机战斗：工程决策、敌人意图与知识卡牌](docs/images/battle.png)
 
@@ -119,6 +119,7 @@ npm run release:pack  # 构建、打包并检查 10 MiB 体积上限
 
 - [工程说明与浏览器回归](docs/ENGINEERING.md)
 - [角色归属与存档约定](docs/OWNERSHIP.md)
+- [十章首领、事件与教学反馈](docs/CHAPTER-ENCOUNTERS.md)
 - [TDD 与验证记录](docs/TDD.md)
 - [资源出处与字体许可](docs/ASSETS.md)
 - [发布维护说明](docs/RELEASING.md)

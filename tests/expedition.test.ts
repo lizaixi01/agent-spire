@@ -28,7 +28,8 @@ import { caseForBattle, transferFor } from "../src/learning-cases";
 function score(card: Card, run: Run): number {
   const d = statsFor(card);
   const b = run.battle!;
-  const enemy = b.enemies.find((e) => e.hp > 0)!;
+  const enemy = targetFor(run);
+  const rule = b.enemies.find(e => e.hp > 0 && e.boss)?.boss;
   const incoming = b.enemies
     .filter((e) => e.hp > 0)
     .reduce((sum, e) => {
@@ -39,6 +40,19 @@ function score(card: Card, run: Run): number {
     }, 0);
   if (d.cost > run.player.energy) return -1000;
   if (d.special === "reset") return run.player.hp <= run.player.maxHp * 0.4 ? 115 : -1000;
+  // Use only the same published rules and progress counters visible to a player.
+  // Both answer policies use identical combat decisions and resource budgets.
+  if (rule?.kind === "window" && rule.used >= 4) return -1000;
+  if (rule?.kind === "feedback" && !rule.ready && d.type !== "attack") return 140;
+  if (rule?.kind === "protocol" && rule.step === 0 && d.type === "skill") return 140;
+  if (rule?.kind === "protocol" && rule.step === 1 && d.type === "attack") return 140;
+  if (rule?.kind === "recovery" && rule.lastCard === card.defId) return -1000;
+  if (rule?.kind === "boundary" && b.turn % 2 && d.block && run.player.block < 16) return 140;
+  if (rule?.kind === "evaluation" && rule.streak < 2) {
+    if (!rule.defended && d.block) return 140;
+    if (!rule.attacked && d.type === "attack") return 135;
+  }
+  if (rule?.kind === "evolution" && rule.resisted === card.defId && d.damage) return 10 + Math.max(0, d.damage + run.player.strength - 6);
   if (d.energy) return 120;
   if (card.defId === "observe") return 110;
   if (d.damage && d.damage + run.player.strength >= enemy.hp + enemy.block)
@@ -61,6 +75,11 @@ function score(card: Card, run: Run): number {
   if (d.draw) return 25;
   return 0;
 }
+function targetFor(run: Run) {
+  const enemies = run.battle!.enemies.filter(e => e.hp > 0);
+  return enemies.find(e => e.boss?.kind === "council" && e.boss.role === "auditor") ??
+    enemies.find(e => e.boss?.kind === "council" && e.boss.role === "actor") ?? enemies[0];
+}
 async function autoRun(
   character: CharacterId,
   seed: number,
@@ -82,7 +101,10 @@ async function autoRun(
     expect(cards.every(card => isCardForCharacter(card.defId, character)), "cross-character card").toBe(true);
     expect(run.player.relics.every(relic => isRelicForCharacter(relic, character)), "cross-character relic").toBe(true);
     expect([...(run.reward?.cards ?? []), ...(run.shop?.cards.map(o => o.card) ?? [])].every(card => LESSON_BY_ID[statsFor(card).lesson].chapter === run.act), "cross-chapter new card").toBe(true);
-    if (run.screen === "victory" || run.screen === "defeat") return run;
+    if (run.screen === "victory" || run.screen === "defeat") {
+      if (process.env.AGENT_ENCOUNTER_DEBUG) console.info(character, seed, applyKnowledge, run.screen, run.act, run.battle?.turn);
+      return run;
+    }
     switch (run.screen) {
       case "map": {
         const priority = {
@@ -112,7 +134,7 @@ async function autoRun(
           run = answerLab(run, applyKnowledge ? correct : (correct + 1) % 3);
           break;
         }
-        const target = run.battle!.enemies.find((e) => e.hp > 0)!;
+        const target = targetFor(run);
         if (run.player.resetCharges === 1 && run.player.hp <= run.player.maxHp * 0.25) {
           const reset = useReset(run);
           if (reset !== run) { run = reset; break; }

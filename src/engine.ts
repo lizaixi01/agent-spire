@@ -15,6 +15,8 @@ import { actLessons, chapterForRow, LESSON_BY_ID, CHAPTER_COUNT, CHAPTER_BOSSES 
 import { caseForBattle, transferFor } from "./learning-cases";
 import { synergyFor } from "./synergy";
 import { TRIALS, trialQuestion, trialReward, type TrialReward } from "./trials";
+import { createBossState, beforeBossCard, afterBossCard, bossCardDamage, bossHpFloor, bossIntent, bossTurnEnd, type BossState } from "./boss-mechanics";
+import { eventView } from "./chapter-events";
 
 export type RoomKind =
   "combat" | "elite" | "boss" | "quiz" | "rest" | "shop" | "event" | "treasure";
@@ -50,6 +52,7 @@ export interface Enemy {
   poison: number;
   art: string;
   trait?: "rage" | "shell";
+  boss?: BossState;
 }
 export interface EnemyAction {
   enemyId: string;
@@ -75,6 +78,8 @@ export interface Battle {
   enemyActions?: EnemyAction[];
   cardsPlayed?: number;
   burstUsed?: boolean;
+  ward?: boolean;
+  review?: "pending" | "passed" | "failed";
 }
 export interface Player {
   hp: number;
@@ -119,6 +124,7 @@ export interface Run {
   } | null;
   reward: { cards: Card[]; gold: number; relic: RelicId | null } | null;
   roomDone: boolean;
+  preparation?: { ward?: boolean; review?: boolean };
   shop: {
     cards: { card: Card; price: number; sold: boolean }[];
     relic: RelicId;
@@ -164,7 +170,7 @@ function makeMap(act: number, rng: { rng: number }): MapNode[] {
       if (row === 2 || (row === 5 && col !== 1)) kind = "quiz";
       if (row === 1 || row === 6) kind = "combat";
       if (row === 3) kind = col === 1 ? "combat" : "elite";
-      if (row === 4 && col === 1) kind = "shop";
+      if (row === 4) kind = col === 1 ? "shop" : "event";
       if (row === 5 && col === 1) kind = "treasure";
       nodes.push({
         id: `${act}-${row}-${col}`,
@@ -321,14 +327,21 @@ function startBattle(run: Run, node: MapNode): void {
     vulnerable: 0,
     poison: 0,
     art: boss ? "boss" : elite ? "golem" : "wisp",
-    trait:
-      boss || (!elite && node.row > 0) ? "rage" : elite ? "shell" : undefined,
+    trait: !boss && !elite && node.row > 0 ? "rage" : elite ? "shell" : undefined,
+    boss: boss ? createBossState(run.act) : undefined,
   };
   if (enemy.name === "注入潜影")
     enemy.pattern = ["weaken", "attack", "heavy", "defend"];
   if (enemy.name === "循环之眼")
     enemy.pattern = ["defend", "attack", "heavy", "attack"];
   const enemies = [enemy];
+  if (boss && run.act === 3) enemy.block = 12;
+  if (boss && run.act === 10) {
+    enemies.push(
+      { ...enemy, id: `${node.id}-actor`, name: "议会执行者", hp: 38, maxHp: 38, damage: 9, art: "golem", pattern: ["attack"], boss: { kind: "council", role: "actor" } },
+      { ...enemy, id: `${node.id}-auditor`, name: "议会审核者", hp: 30, maxHp: 30, damage: 0, art: "wisp", boss: { kind: "council", role: "auditor" } },
+    );
+  }
   if (elite && tier > 1)
     enemies.push({
       ...enemy,
@@ -359,7 +372,10 @@ function startBattle(run: Run, node: MapNode): void {
     sequence: [],
     cardsPlayed: 0,
     burstUsed: false,
+    ward: run.preparation?.ward,
+    review: run.preparation?.review ? "pending" : undefined,
   };
+  delete run.preparation;
   run.battle.lab = {
     caseId: caseForBattle(run).id,
     choice: null,
@@ -380,6 +396,8 @@ export function enemyIntent(
   enemy: Enemy,
   turn: number,
 ): { kind: "attack" | "defend" | "weaken" | "heavy"; value: number } {
+  const special = bossIntent(enemy, turn);
+  if (special) return special;
   const kind = enemy.pattern[(turn - 1) % enemy.pattern.length];
   const base =
     kind === "defend"
@@ -389,17 +407,19 @@ export function enemyIntent(
         : kind === "heavy"
           ? Math.floor(enemy.damage * 1.6)
           : enemy.damage;
+  const pressure = enemy.boss?.kind === "window" ? Math.max(0, enemy.boss.used - 4) * 2 : enemy.boss?.kind === "reward" ? enemy.boss.debt * 3 : 0;
   return {
     kind,
     value:
       kind === "attack" || kind === "heavy"
-        ? Math.floor(base * (enemy.weak > 0 ? 0.75 : 1))
+        ? Math.floor((base + pressure) * (enemy.weak > 0 ? 0.75 : 1))
         : base,
   };
 }
 function hurt(
   target: { hp: number; block: number; vulnerable: number },
   damage: number,
+  floor = 0,
 ): void {
   const amount = Math.max(
     0,
@@ -407,10 +427,16 @@ function hurt(
   );
   const absorbed = Math.min(target.block, amount);
   target.block -= absorbed;
-  target.hp = Math.max(0, target.hp - amount + absorbed);
+  target.hp = Math.max(Math.min(target.hp, floor), target.hp - amount + absorbed);
 }
 function heal(run: Run, amount: number): void {
   run.player.hp = Math.min(run.player.maxHp, run.player.hp + amount);
+}
+function damagePlayer(run: Run, amount: number): void {
+  if (amount > 0 && run.battle!.ward) {
+    run.battle!.ward = false;
+    addLog(run, "隔离执行舱：抵消一次敌人攻击，保护已消耗。");
+  } else hurt(run.player, amount);
 }
 function addLog(run: Run, message: string): void {
   run.battle!.log.push(message);
@@ -465,6 +491,19 @@ export function burstBonus(run: Run, card: Card): number {
   const def = statsFor(card);
   return def.damage && def.cost >= 2 && hasRelic(run, "anvil") && run.battle && !run.battle.burstUsed ? 8 : 0;
 }
+export function takeBossBait(input: Run): Run {
+  if (!combatUnlocked(input) || !input.battle?.enemies.some(e => e.hp > 0 && e.boss?.kind === "reward" && !e.boss.claimed)) return input;
+  const run = clone(input);
+  const enemy = run.battle!.enemies.find(e => e.hp > 0 && e.boss?.kind === "reward")!;
+  if (enemy.boss?.kind !== "reward") return input;
+  enemy.boss.claimed = true;
+  enemy.boss.debt++;
+  enemy.hp = Math.min(enemy.maxHp, enemy.hp + 20);
+  run.player.energy += 2;
+  run.battle!.enemyActions = [];
+  addLog(run, "领取诱饵：能量 +2；首领回复 20 生命，所有后续攻击 +3。");
+  return run;
+}
 export function playCard(input: Run, uid: string, targetId?: string): Run {
   if (!combatUnlocked(input) || !input.battle) return input;
   const card = input.battle.hand.find((c) => c.uid === uid);
@@ -482,9 +521,11 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
   battle.enemyActions = [];
   const p = run.player;
   const enemy = battle.enemies.find((e) => e.id === targetId)!;
+  const hpBefore = new Map(battle.enemies.map(e => [e.id, e.hp]));
   p.energy -= d.cost;
   battle.hand = battle.hand.filter((c) => c.uid !== uid);
   if (!run.learned.includes(d.lesson)) run.learned.push(d.lesson);
+  const bossDraw = beforeBossCard(run, d);
   if (d.damage) {
     const burst = burstBonus(input, card);
     if (burst) {
@@ -494,7 +535,7 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
     const amount = Math.floor(
       (d.damage + p.strength + synergy.damage + burst) * (p.weak > 0 ? 0.75 : 1),
     );
-    for (let hit = 0; hit < (d.hits ?? (d.special === "echo" ? 2 : 1)) && enemy.hp > 0; hit++) hurt(enemy, amount);
+    for (let hit = 0; hit < (d.hits ?? (d.special === "echo" ? 2 : 1)) && enemy.hp > 0; hit++) hurt(enemy, bossCardDamage(run, enemy, d, amount), bossHpFloor(enemy));
   }
   p.block += (d.block ?? 0) + synergy.block;
   p.energy += (d.energy ?? 0) + synergy.energy;
@@ -512,7 +553,7 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
     p.vulnerable = 0;
   }
   // Draw before discarding the played card: it cannot immediately draw itself.
-  if (d.draw || synergy.draw) draw(run, (d.draw ?? 0) + synergy.draw);
+  if (d.draw || synergy.draw || bossDraw) draw(run, (d.draw ?? 0) + synergy.draw + bossDraw);
   battle.cardsPlayed = (battle.cardsPlayed ?? 0) + 1;
   if (hasRelic(run, "thread") && battle.cardsPlayed % 3 === 0) {
     draw(run, 1);
@@ -523,11 +564,14 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
   if (d.exhaust || d.type === "power") battle.exhaust.push(card);
   else battle.discard.push(card);
   if (d.purge) run.deck = run.deck.filter(c => c.uid !== card.uid);
+  const counter = afterBossCard(run, d, hpBefore);
+  if (counter) { damagePlayer(run, counter); addLog(run, `原样重试：首领反击 ${counter} 点。`); }
   addLog(
     run,
     `打出「${d.name}${card.upgraded ? "+" : ""}」${target ? ` → ${target.name}` : ""}。`,
   );
-  rewardVictory(run);
+  if (!p.hp) run.screen = "defeat";
+  else rewardVictory(run);
   return run;
 }
 export function endTurn(input: Run): Run {
@@ -543,7 +587,7 @@ export function endTurn(input: Run): Run {
   for (const enemy of b.enemies.filter((e) => e.hp > 0)) {
     enemy.block = 0;
     if (enemy.poison) {
-      enemy.hp = Math.max(0, enemy.hp - enemy.poison);
+      enemy.hp = Math.max(bossHpFloor(enemy), enemy.hp - enemy.poison);
       enemy.poison--;
     }
     if (!enemy.hp) continue;
@@ -552,12 +596,15 @@ export function endTurn(input: Run): Run {
     const blockBefore = p.block;
     if (intent.kind === "defend") {
       enemy.block = intent.value;
+      if (enemy.boss?.kind === "council" && enemy.boss.role === "auditor") {
+        for (const ally of b.enemies.filter(e => e.hp > 0 && e.id !== enemy.id)) ally.block += intent.value;
+      }
       addLog(run, `${enemy.name} 获得 ${intent.value} 点格挡。`);
     } else if (intent.kind === "weaken") {
       p.weak += intent.value;
       addLog(run, `${enemy.name} 施加 ${intent.value} 层虚弱。`);
     } else {
-      hurt(p, intent.value);
+      damagePlayer(run, intent.value);
       addLog(run, `${enemy.name} 发动 ${intent.value} 点攻击。`);
     }
     b.enemyActions.push({ enemyId: enemy.id, ...intent, damage: hpBefore - p.hp, blocked: blockBefore - p.block });
@@ -565,6 +612,7 @@ export function endTurn(input: Run): Run {
     enemy.vulnerable = Math.max(0, enemy.vulnerable - 1);
     if (enemy.trait === "rage") enemy.damage++;
     if (enemy.trait === "shell") enemy.block += 4;
+    bossTurnEnd(enemy);
     if (!p.hp) {
       run.screen = "defeat";
       return run;
@@ -572,13 +620,14 @@ export function endTurn(input: Run): Run {
   }
   rewardVictory(run);
   if (run.screen === "reward") return run;
+  const sandboxBlock = b.turn % 2 && b.enemies.some(e => e.hp > 0 && e.boss?.kind === "boundary") ? Math.min(p.block, 16) : 0;
   b.turn++;
   b.sequence = [];
   b.cardsPlayed = 0;
   b.burstUsed = false;
   b.observed = false;
   p.block =
-    (b.retention ? Math.min(p.block, 8) : 0) +
+    Math.max(sandboxBlock, b.retention ? Math.min(p.block, 8) : 0) +
     (p.relics.includes("seal") ? 3 : 0);
   p.energy = p.maxEnergy + b.cache;
   draw(run, CHARACTERS.find(c => c.id === run.character)!.draw + (p.relics.includes("prism") ? 1 : 0));
@@ -627,6 +676,12 @@ export function answerLab(input: Run, choice: number): Run {
       run.player.gold += 10;
       addLog(run, "情境与原理均验证：获得 6 格挡、10 金币与掌握度。");
     }
+    if (run.battle!.review === "pending") {
+      const passed = lab.choice === scenario.correct && choice === transferFor(scenario).correct;
+      run.battle!.review = passed ? "passed" : "failed";
+      if (passed) { run.player.gold += 60; heal(run, 10); }
+      addLog(run, passed ? "固定种子复测通过：额外获得 60 金币并回复 10 生命。" : "固定种子复测未通过：押注预算不返还。");
+    }
   }
   return run;
 }
@@ -644,11 +699,10 @@ export function usePotion(input: Run, index: number, targetId?: string): Run {
   run.player.potions.splice(index, 1);
   if (potion === "heal") heal(run, 20);
   if (potion === "energy") run.player.energy += 2;
-  if (potion === "fire")
-    hurt(
-      run.battle!.enemies.find((e) => e.id === targetId)!,
-      20,
-    );
+  if (potion === "fire") {
+    const enemy = run.battle!.enemies.find((e) => e.id === targetId)!;
+    hurt(enemy, 20, bossHpFloor(enemy));
+  }
   addLog(run, "使用了一瓶药水。");
   rewardVictory(run);
   return run;
@@ -825,16 +879,42 @@ export function claimTreasure(input: Run): Run {
 export function resolveEvent(
   input: Run,
   choice: "study" | "risk" | "leave",
+  uid?: string,
 ): Run {
-  if (input.screen !== "event" || input.roomDone) return input;
+  if (input.screen !== "event" || input.roomDone || !["study", "risk", "leave"].includes(choice)) return input;
+  const view = eventView(input);
+  const selected = view.targets.find(c => c.uid === uid);
+  if (choice === "risk" && (view.disabled || (view.targeted && !selected))) return input;
   const run = clone(input);
   if (choice === "study") {
     startQuiz(run, false);
     return run;
   }
   if (choice === "risk") {
-    run.player.hp = Math.max(0, run.player.hp - 8);
-    run.player.gold += 45;
+    run.player.gold -= view.cost;
+    switch (run.act) {
+      case 1: run.player.hp = Math.max(0, run.player.hp - 8); run.player.gold += 45; break;
+      case 2: run.deck = run.deck.filter(c => c.uid !== uid); break;
+      case 3: run.deck.push(makeCard(run, selected!.defId)); break;
+      case 4: run.deck.find(c => c.uid === uid)!.upgraded = true; break;
+      case 5: run.deck.find(c => c.uid === uid)!.upgraded = false; run.player.gold += 65; break;
+      case 6: run.player.hp = Math.max(0, run.player.hp - 10); run.preparation = { ...run.preparation, ward: true }; break;
+      case 7: run.preparation = { ...run.preparation, review: true }; break;
+      case 8: run.player.maxHp -= 12; run.player.hp = Math.min(run.player.hp, run.player.maxHp); run.player.gold += 90; break;
+      case 9: {
+        const copy = run.deck.find(c => c.uid !== uid && c.defId === selected!.defId && !c.upgraded)!;
+        run.deck = run.deck.filter(c => c.uid !== copy.uid);
+        run.deck.find(c => c.uid === uid)!.upgraded = true;
+        break;
+      }
+      case 10: {
+        const first = run.player.potions.shift()!;
+        const other = run.player.potions.findIndex(p => p !== first);
+        run.player.potions.splice(other, 1);
+        addRelic(run, view.relic!);
+        break;
+      }
+    }
     if (run.player.hp === 0) {
       run.screen = "defeat";
       return run;

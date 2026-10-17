@@ -28,6 +28,9 @@ function victory(boss = false, chapter = 1) {
   const run = readyForCards(room("boss", chapter));
   run.battle!.room = boss ? "boss" : "combat";
   run.battle!.enemies[0].hp = 1;
+  // This fixture tests reward/progression after victory. The council's support
+  // units must also be defeated; their target-order mechanic has its own tests.
+  run.battle!.enemies.slice(1).forEach(e => { e.hp = 0; });
   run.battle!.hand = [{ uid: "win", defId: "strike", upgraded: false }];
   return playCard(run, "win", run.battle!.enemies[0].id);
 }

@@ -2916,9 +2916,47 @@ body:has(.modal-backdrop) .trial-celebration { visibility:hidden; }
 .node-chapter { position:absolute; right:-6px; bottom:-6px; width:18px; height:18px; background:#102131; border:1px solid #8aab9b; color:#dce8c9; font-size:11px; line-height:16px; }
 .lab-code { max-width:100%; margin:12px 0 5px; padding:12px; overflow:auto; max-height:300px; background:#0d1e2c; border-left:2px solid #92bbac; color:#c2dfd6; font:13px/1.65 Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; tab-size:4; }
 .lab-code-label { display:block; color:#859fa0; font-size:11px; margin-bottom:14px; }
-.lab-previous { padding:10px 0; border-block:1px solid #486270; margin:12px 0; font-size:12px; color:#b8c6b8; }
-.lab-previous > summary { cursor:pointer; color:#dab97e; line-height:1.7; }
-.lab-previous > p { font-size:12px; line-height:1.7; margin:8px 0 0; }
+.lab-feedback { padding:14px; border:1px solid #b68b54; border-left:4px solid #dab97e; background:#283a40; margin:12px 0 20px; font-size:12px; color:#d6dfd2; overflow-wrap:anywhere; }
+.lab-feedback.correct { border-color:#83b99a; background:#203b38; }
+.lab-feedback h3 { font-size:13px; line-height:1.7; margin:0 0 8px; color:#f2d292; }
+.lab-feedback.correct h3 { color:#a5d6b8; }
+.lab-feedback p { font-size:12px; line-height:1.8; margin:8px 0 0; }
+.lab-feedback .feedback-question { color:#afc0c7; padding-bottom:8px; border-bottom:1px solid #486270; }
+.boss-mechanic { margin:12px 0; padding:14px 18px; border:1px solid #a98d56; background:#26383d; color:#d7dfcd; }
+.boss-mechanic h3 { display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px; font-size:15px; color:#edcc8d; margin:0; }
+.boss-mechanic h3 small { font-size:11px; color:#9aafb6; line-height:1.8; }
+.boss-mechanic p { font-size:13px; line-height:1.9; margin:8px 0; }
+.boss-progress { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12px; line-height:1.8; color:#acd1c0; }
+.boss-mechanic .secondary-button { margin:12px 0 0; font-size:12px; white-space:normal; }
+.event-story { max-width:860px; margin:0 auto 20px; line-height:1.9; color:#bac9c7; }
+.event-contract { border:1px solid #b38d54; padding:18px; background:#2d3b3c; }
+.event-contract h3 { margin:0 0 8px; color:#e6c487; }
+.event-contract p { font-size:14px; line-height:1.9; }
+.event-contract small, .event-choice em { color:#e2bd80; font-size:12px; font-style:normal; }
+.event-targets { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; margin:24px auto; }
+.event-choice small { line-height:1.8; }
+.encounter-preparation { padding:10px 14px; border-left:3px solid #88c6ab; color:#b7dac6; background:#23373b; font-size:12px; line-height:1.8; }
+.combat-stage .enemies:has(.enemy-fighter:nth-child(3)) { flex:1; min-width:0; max-width:65%; gap:10px; }
+.combat-stage .enemies:has(.enemy-fighter:nth-child(3)) .enemy-fighter { flex:1 1 0; min-width:0; width:30%; }
+.combat-stage .enemies:has(.enemy-fighter:nth-child(3)) .enemy-art { width:100%; object-fit:contain; }
+@media (max-width:700px) {
+  .boss-mechanic { padding:12px; margin:8px; }
+  .boss-mechanic p { font-size:12px; }
+  .event-targets { gap:10px; }
+}
+@media (max-width:760px) {
+  .combat-stage .battlefield:has(.enemy-fighter:nth-child(3)) .player-fighter { width:82px; min-width:76px; }
+  .combat-stage .battlefield:has(.enemy-fighter:nth-child(3)) .hero-art { width:82px; height:120px; }
+  .combat-stage .enemies:has(.enemy-fighter:nth-child(3)) { max-width:none; margin-left:0; gap:2px; }
+  .combat-stage .enemies:has(.enemy-fighter:nth-child(3)) .enemy-art { width:100%; height:120px; }
+  .enemies:has(.enemy-fighter:nth-child(3)) .enemy-name { font-size:10px; letter-spacing:0; white-space:normal; min-height:27px; line-height:1.35; }
+  .enemies:has(.enemy-fighter:nth-child(3)) .enemy-health { width:100%; max-width:none; }
+  .enemies:has(.enemy-fighter:nth-child(3)) .enemy-intent { gap:2px; }
+  .enemies:has(.enemy-fighter:nth-child(3)) .enemy-intent b { font-size:16px; }
+  .enemies:has(.enemy-fighter:nth-child(3)) .enemy-intent small { display:none; }
+  .enemies:has(.enemy-fighter:nth-child(3)) .target-marker { letter-spacing:0; font-size:8px; }
+  .enemies:has(.enemy-fighter:nth-child(3)) .enemy-fighter.targeted:before { width:100%; }
+}
 .quiz-page .trial-code { white-space:pre; max-height:340px; overflow:auto; tab-size:4; }
 .option-analysis { display:grid; gap:12px; margin:18px 0; text-align:left; }
 .option-analysis > div { padding:10px 12px; border-left:2px solid #667e87; background:#102332; }
