@@ -1,5 +1,8 @@
 import { LESSON_BY_ID } from "./content";
 import type { LearningCase } from "./learning-cases";
+import type { TrialQuestion } from "./trials";
+
+export interface LearningHint { focus: string; method: string }
 
 // Reading prompts for the current exercises, independent of answer indices and
 // shuffled option order. These guide inspection; explanations remain post-answer.
@@ -90,13 +93,87 @@ const EXERCISE_HINTS: Record<string, string> = {
   "reviewer-check-selection": "先定位需要验证的失败路径，再比较每项审查动作能带来哪一种新的、可观察证据。",
 };
 
-export function caseHint(c: LearningCase, phase: "action" | "transfer"): { focus: string; method: string } {
+// Concept prompts are written separately from the answer/explanation fields.
+const LESSON_HINTS: Record<string, string> = {
+  agent: "把一次可运行任务拆成三个问题：谁选择下一步、依据什么信息、通过什么接口产生外部变化？对照各方案是否覆盖完整链路。",
+  react: "想象工具返回了与你预期不同的结果：进入下一次决策前，当前轨迹还缺哪类新证据？",
+  harness: "假设模型知道规则却仍提出错误动作，想想模型之外的运行环境需要在哪些位置发现、阻止或纠正问题。",
+  context: "沿关键事实到本次模型输入画一条路径，找出事实第一次缺席的位置；改变指令语气能补上哪一段？",
+  cache: "把前后两轮输入并排，找出从开头起第一个不同的位置，再判断后面哪些内容仍能复用。",
+  injection: "外部资料中出现命令时，先追溯它由谁提供、原任务授权了什么，再判断文字所在的位置能否自行产生权限。",
+  skills: "把发现某项能力和真正使用它分成两步：每一步各需要多少信息，哪些细节可以等到用时再读？",
+  compression: "设想接手者只读压缩结果就继续任务：哪些遗漏会使他重犯错误、越过限制或无法核对结论？",
+  memory: "比较一次运行中发生的全部事件，与下次会话仍值得调用的信息；两者的保留范围和更新方式需要一样吗？",
+  rag: "把尚未掌握外部事实与已有证据可生成回答列成两个状态，尝试排出连接这两个状态所需的步骤。",
+  hybrid: "分别想一个关键词必须精确匹配的查询和一个使用同义改写的查询，观察单一路召回可能漏掉什么。",
+  aci: "设想调用者第一次接触这个工具：仅凭接口说明，能否判断何时使用、输入什么以及什么情况会失败？",
+  fidelity: "把模型看到的请求与后端实际执行的请求逐项对齐；若两者不一致，调用者能否据返回信息定位差异？",
+  mcp: "用读取一份文档、触发一次操作、复用一段提示这三个例子分别分类，注意它们是否承担相同职责。",
+  discovery: "假设工具数量再增加十倍，分别估算发现入口和一次实际调用各需要加载多少信息。",
+  constraints: "设想模型仍然提出越权请求：检查哪种措施能在动作真正发生前约束所有调用者，而不依赖承诺。",
+  recovery: "对照错误要求与下一次请求，问自己哪些条件发生变化后才可能成功；只增加尝试次数会改变这些条件吗？",
+  isolation: "假设一个身份已经发生错误，沿它能访问的资源和共享状态追踪影响会传播到哪里，再区分预防出错与限制损失。",
+  events: "把外部变化发生、运行时接收变化与下一次决策画到时间线上，检查变化通过哪条路径进入决策。",
+  pass: "把连续五次都成功拆成五个同时成立的条件；在题设独立假设下逐个组合，最后换算百分比，别与至少一次成功混淆。",
+  evaluation: "把两个版本的运行前状态并排比较，想想若前一个版本留下了修改，观察到的差异还能否单独归因给版本。",
+  ablation: "分别列出这四个任务里观察到的现象与尚未覆盖的任务范围，思考结论的适用范围能否超过证据范围。",
+  sft: "查看两种训练各自如何给一个候选行为打分并更新参数；把直接优化的量与最终希望获得的泛化表现分开。",
+  support: "先计算这一批轨迹之间是否存在可区分的成功信号，再沿执行路径定位它们从哪里开始全部失败。",
+  reward: "假设绿灯来自减少检查内容，原任务中还有哪些要求没有被这个结果验证？分别检查产物与产生它的动作。",
+  evolution: "先判断这条经验是事实、建议还是可以反复执行的确定性规则，再比较不同保存方式能否在每次调用时生效。",
+  retention: "为新版本画两列结果：新问题改善了什么、原有能力损失了什么；一次局部提升能否覆盖另一列的变化？",
+  sleep: "把在线收集轨迹与整理已有经验分成两个阶段，检查后者要解决哪些重复、冲突和版本问题，而不是只看钟点。",
+  collaboration: "逐项列出每个审核动作带来的新增观察；重复同一段说明与接触外部运行结果，在证据上有何差别？",
+  reviewer: "分别标出作者的声明与审查者可以独立核对的材料，再问更换作者后，验收标准是否应随之变化。",
+  handoff: "沿 A→B→A 画出调用链，逐次扣减剩余资源，看看运行时需要记住什么才能识别重复访问和预算耗尽。",
+};
+
+// Frozen saves have no question IDs. Their distinct pseudocode exercises are
+// keyed by both lesson and title; ordinary concept questions use LESSON_HINTS.
+const LEGACY_HINTS: Record<string, string> = {
+  "memory/先写日志": "把原始事实和派生状态分开，检查中断发生在 rebuild 之前时，之后还能从哪里找回输入。",
+  "memory/重建检查点": "比较输入只剩最后一条与输入仍包含早期事实两种情况，想想重建后哪些字段还能有依据。",
+  "memory/确定性查询": "把年份与国际旅行条件逐条套到 trips 上，想想同一份结构化输入怎样得到可重复的统计。",
+  "memory/提取什么": "将稳定偏好与本次工具的瞬时细节分开，判断哪一种信息在未来订票时仍可能有用。",
+  "memory/保留历史": "画出搬家前后的时间线，检查保存新事实后，系统是否还需要回答过去住在哪里的问题。",
+  "memory/延迟批处理": "观察 buffer 的两个触发条件，比较逐条提取与积累后处理的调用次数及读取时机。",
+  "compression/在哪压缩": "先圈出两次 model 调用，检查消息列表在哪个位置可以改变而不改动正在执行的那次调用。",
+  "compression/阈值触发": "按代码计算 threshold，再比较 used 与它的关系；注意题干是在复现实验参数，而非规定通用阈值。",
+  "compression/防重复处理": "给已经处理过的消息画一个记号，再沿循环判断下一轮如何区分原始结果与已有摘要。",
+  "memory/状态与证据": "假设未来要审查一个旧结论，或更换重建规则，比较只剩派生状态与仍能访问输入证据的区别。",
+  "memory/约束执行": "题设已经给出日期字段与适用范围，先列出需要比较的量，再判断检查能否重复执行并核对。",
+  "memory/冲突检测": "把两组字段并排，逐项查找需要交叉核对的类别，想想怎样使同一输入的检查结果可重复。",
+  "memory/混合检索": "把相关性与时间有效性分成两个判断：过去的地址即使很相似，是否就能代表当前事实？",
+  "memory/实体消歧": "设想两条同名记录同时存在，检查除了姓名之外，还需要哪些关系或背景才能指向正确的人。",
+  "memory/选对存储": "分别为稳定偏好和某次经历写出查询条件，比较它们对主题与时间字段的依赖。",
+  "compression/任务感知摘要": "同一批搜索结果若服务两个不同问题，值得保留的部分会一样吗？检查摘要调用获得了哪些筛选依据。",
+  "compression/语义完整": "尝试仅凭摘要复原一次具体职位变化，逐项核对哪些参与者、关系和定位信息无法确定。",
+  "compression/失败熔断": "沿失败次数增长的路径检查剩余预算，想象达到上限后继续循环与明确退出分别会发生什么。",
+  "ablation/控制变量": "先圈出这次唯一希望衡量的模块变化，再比较两组运行的模型、任务、种子与预算是否仍可对照。",
+  "handoff/有界移交": "设想接手者只看 payload 就开始执行，逐项检查他是否知道要做什么、受哪些限制以及怎样判断完成。",
+};
+
+const CODE_METHOD = "先区分代码现在做了什么和题设要求它做到什么，再比较各方案改变了哪一步。";
+const CONCEPT_METHOD = "先明确题目在比较的维度，再用一个具体例子检验每种说法是否满足题设。";
+
+export function practiceHint(lessonId: string): LearningHint {
+  return { focus: LESSON_HINTS[lessonId], method: CONCEPT_METHOD };
+}
+
+// Deliberately accepts no answer, option or explanation fields.
+export function trialHint(question: Pick<TrialQuestion, "id" | "lessonId" | "title" | "code">): LearningHint {
+  const focus = (question.id && EXERCISE_HINTS[question.id]) ||
+    LEGACY_HINTS[`${question.lessonId}/${question.title}`] || LESSON_HINTS[question.lessonId];
+  return { focus, method: question.code ? CODE_METHOD : CONCEPT_METHOD };
+}
+
+export function caseHint(c: LearningCase, phase: "action" | "transfer"): LearningHint {
   const id = c.id.replace(/^code-v2-/, "");
   const focus = EXERCISE_HINTS[id] ?? `围绕「${LESSON_BY_ID[c.lesson].title}」，先列出题设证据和当前动作真正读取的信息，再与任务的限制逐项核对。`;
   return {
     focus,
     method: phase === "action"
-      ? "先区分代码现在做了什么和题设要求它做到什么，再比较各方案改变了哪一步。"
+      ? CODE_METHOD
       : "这一问在判断同事方案的解释。将该方案代入当前证据，检查理由是否对应真实执行路径，而不只是提到了相关术语。",
   };
 }
