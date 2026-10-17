@@ -1,4 +1,6 @@
 import { restoreCurriculum } from "./curriculum";
+import { restoreBeginnerLearning } from "./beginner-migration";
+import { BEGINNER_BY_ID } from "./beginner-content";
 import { restoreCharacterOwnership } from "./ownership";
 import type { Run } from "./engine";
 import { CARD_BY_ID, CHARACTERS, RELICS, type RelicId } from "./cards";
@@ -197,6 +199,11 @@ function valid(value: unknown): value is Run {
       object(a) && str(a.enemyId) && (b.enemies as Obj[]).some(e => e.id === a.enemyId) &&
       ["attack", "defend", "weaken", "heavy"].includes(String(a.kind)) &&
       ["value", "damage", "blocked"].every(k => num(a[k])))) return false;
+    if (b.attackHits !== undefined && (!Array.isArray(b.attackHits) || b.attackHits.length > 12 || !b.attackHits.every(h =>
+      object(h) && str(h.targetId) && enemies.some(e => e.id === h.targetId) &&
+      ["damage", "blocked", "hpBefore", "hpAfter", "blockBefore", "blockAfter"].every(k => num(h[k])) &&
+      (h.hpBefore as number) - (h.hpAfter as number) === h.damage &&
+      (h.blockBefore as number) - (h.blockAfter as number) === h.blocked))) return false;
     if (
       b.lab !== undefined &&
       (!object(b.lab) ||
@@ -208,6 +215,9 @@ function valid(value: unknown): value is Run {
       return false;
     if (object(b.lab) && [b.lab.order,b.lab.transferOrder].some(order => order !== undefined &&
       (!Array.isArray(order) || order.length !== 3 || !order.every(i=>num(i,2)) || new Set(order).size !== 3))) return false;
+    if (object(b.lab) && b.lab.beginnerTransfer !== undefined &&
+      (typeof b.lab.beginnerTransfer !== "boolean" || (b.lab.beginnerTransfer &&
+        (b.lab.choice === null || CASE_BY_ID[String(b.lab.caseId)].level === "beginner")))) return false;
     if (
       !(b.enemies as Obj[]).every(
         (e) =>
@@ -226,15 +236,21 @@ function valid(value: unknown): value is Run {
   )
     return false;
   if (value.completedTrials !== undefined && !array(value.completedTrials, id => str(id) && Object.hasOwn(TRIAL_BY_ID, id))) return false;
+  if (object(value.quiz) && value.quiz.beginnerQuestion !== undefined &&
+    (value.quiz.trial !== undefined || !str(value.quiz.beginnerQuestion) || !Object.hasOwn(BEGINNER_BY_ID,value.quiz.beginnerQuestion) ||
+      BEGINNER_BY_ID[value.quiz.beginnerQuestion].lessonId !== value.quiz.lessonId)) return false;
   if (value.encounteredCases !== undefined && !array(value.encounteredCases, id => str(id) && Object.hasOwn(CASE_BY_ID,id))) return false;
   if (object(value.quiz) && value.quiz.trial !== undefined) {
     const q = value.quiz, t = q.trial;
     if (!object(t) || !str(t.id) || !Object.hasOwn(TRIAL_BY_ID, t.id) || !num(t.step, 2) ||
-      !(t.revision === undefined || t.revision === 1 || t.revision === 2) ||
+      !(t.revision === undefined || t.revision === 1 || t.revision === 2 || t.revision === 3) ||
       !array(t.answers, a => num(a, 2)) || !Array.isArray(t.answers) ||
       t.answers.length !== t.step + (q.selected === null ? 0 : 1) ||
       (q.selected === null ? q.correct !== null : t.answers.at(-1) !== q.selected)) return false;
     const definition = trialDefinition(q as unknown as NonNullable<Run["quiz"]>);
+    if (!definition) return false;
+    if (t.introOverrides !== undefined && (t.revision === 3 || !Array.isArray(t.introOverrides) || t.introOverrides.length !== 3 ||
+      !t.introOverrides.every(id => id === null || (str(id) && Object.hasOwn(BEGINNER_BY_ID,id) && BEGINNER_BY_ID[id].chapter === value.act)))) return false;
     if (t.order !== undefined && (!array(t.order, i => num(i,definition.questions.length-1)) || !Array.isArray(t.order) || t.order.length !== 3 || new Set(t.order).size !== 3)) return false;
     if (t.optionOrders !== undefined && (!Array.isArray(t.optionOrders) || t.optionOrders.length !== 3 || !t.optionOrders.every(order => Array.isArray(order) && order.length === 3 && order.every(i => num(i,2)) && new Set(order).size === 3))) return false;
     const typed = value as unknown as Run;
@@ -295,6 +311,7 @@ export function decodeRun(raw: string): Run | null {
     const value: unknown = JSON.parse(raw);
     if (!valid(value)) return null;
     restoreCurriculum(value);
+    restoreBeginnerLearning(value);
     restoreCharacterOwnership(value);
     return value;
   } catch {

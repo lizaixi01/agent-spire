@@ -18,12 +18,12 @@ async function engineeringUI(page) {
       const q=c.caseForBattle(r),second=c.transferFor(q);
       battles.push({run:r,prompt:q.situation,code:q.evidence,first:q.correct,second:second.correct});
     }
-    const quizzes=[['checkpoint-write','checkpoint-boundary',3],['memory-write','memory-late-arrival',3],['compaction-trigger','compaction-reserve',2]].map(([id,key,chapter])=>{
-      const source=t.TRIAL_BY_ID[id],index=source.questions.findIndex(q=>q.id===key);
+    const quizzes=[['intro-3-1',3],['intro-3-2',3],['intro-2-1',2]].map(([id,chapter])=>{
+      const source=t.TRIAL_BY_ID[id],index=0,key=source.questions[0].id;
       const start=chapterRun(chapter),node=e.availableNodes(start)[0];node.kind='quiz';
       const run=e.enterNode(start,node.id);
       const order=[index,...source.questions.map((_,i)=>i).filter(i=>i!==index).slice(0,2)];
-      run.quiz={lessonId:source.questions[index].lessonId,selected:null,correct:null,boss:false,trial:{id,revision:2,step:0,answers:[],reward:null,order,optionOrders:[[2,0,1],[1,2,0],[0,1,2]]}};
+      run.quiz={lessonId:source.questions[index].lessonId,selected:null,correct:null,boss:false,trial:{id,revision:3,step:0,answers:[],reward:null,order,optionOrders:[[2,0,1],[1,2,0],[0,1,2]]}};
       run.player.hp=40;run.player.potions=[];
       return {run,key,questions:[0,1,2].map(i=>t.trialQuestionAt(run.quiz,i))};
     });
@@ -39,12 +39,13 @@ async function engineeringUI(page) {
     await load(f.run);
     const prompt=await page.locator('.lab-situation').innerText();
     if(seen.has(prompt))throw new Error('Repeated chapter-10 engineering decision');seen.add(prompt);
-    if((await page.locator('.lab-code').innerText())!==f.code)throw new Error('Code damaged by HTML rendering');
+    if(await page.locator('.lab-code').count()||(await page.locator('.lab-evidence').innerText())!==f.code)throw new Error('Beginner evidence must be plain language');
+    if(!(await page.locator('.learning-intro').innerText()).includes('先认识一下'))throw new Error('Missing beginner introduction');
     if(await page.locator('.hand .game-card:not(:disabled)').count())throw new Error('Mandatory gate bypassed');
     if(i===0)await page.screenshot({path:'output/engineering-chapter10-a.png',fullPage:true});
     await page.locator('[data-action="lab-choice"]').nth(f.first).click();
     if((await page.locator('.lab-situation').innerText())===prompt)throw new Error('Second stage still shows old prompt');
-    if(!(await page.locator('.lab-panel > summary').innerText()).includes('错因辨析'))throw new Error('Diagnostic stage unclear');
+    if(!(await page.locator('.lab-panel > summary').innerText()).includes('巩固一下'))throw new Error('Beginner follow-up stage unclear');
     await page.locator('[data-action="lab-choice"]').nth(f.second).click();
     if(!(await page.locator('.lab-completion').innerText()).includes('掌握度 +1'))throw new Error('Shuffled answers lost correctness');
     if(i===1)await page.screenshot({path:'output/engineering-chapter10-b.png',fullPage:true});
@@ -58,7 +59,7 @@ async function engineeringUI(page) {
     await load(f.run);
     if(await page.locator('.option-analysis').count())throw new Error('Rationales leaked before answer');
     if(await page.locator('.quiz-option.correct').count())throw new Error('Correct option leaked before answer');
-    if((await page.locator('.trial-code').innerText())!==f.questions[0].code)throw new Error('Trial code changed');
+    if(await page.locator('.trial-code').count()||!(await page.locator('.learning-intro').innerText()).includes(f.questions[0].intro))throw new Error('Trial must teach a simple concept before asking');
     const wrong=(f.questions[0].correct+1)%3;
     await page.locator('[data-action="answer"]').nth(wrong).click();
     if(await page.locator('.option-analysis > div').count()!==3)throw new Error('Missing per-option diagnosis');
@@ -77,5 +78,5 @@ async function engineeringUI(page) {
     if(after.player.gold!==179||after.player.hp!==48||after.player.potions[0]!=='energy')throw new Error('Incorrect claimed resources');
   }
   if(errors.length)throw new Error(errors.join('\n'));
-  return 'PASS: six distinct chapter-10 code decisions, shuffled two-stage gate, mobile code scrolling, three practical topics, hidden explanations before answer, per-option rationale after answer, reload and real pass rewards.';
+  return 'PASS: six distinct beginner chapter-10 decisions, reading guides, shuffled two-stage gate, mobile, three beginner trials, per-option explanations, reload and real rewards.';
 }

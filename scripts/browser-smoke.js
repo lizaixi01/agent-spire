@@ -19,8 +19,6 @@ async function browserSmoke(page) {
     .getByRole("button", { name: "第 1 层 未知遭遇，可前往" })
     .first()
     .click();
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
   async function finishBattle() {
     while (await page.locator('[data-action="lab-choice"]').count()) {
       const index = await page.evaluate(async () => {
@@ -98,7 +96,10 @@ async function browserSmoke(page) {
     throw new Error("Search results mismatch");
   await page.locator(".lesson-card").click();
   await page.getByRole("button", { name: "检验我的理解", exact: true }).click();
-  await page.locator('[data-action="practice-answer"]').nth(1).click();
+  const practiceCorrect=await page.evaluate(async()=>{
+    const {practiceQuestion}=await import('/src/beginner-content.ts'); return practiceQuestion('react').correct;
+  });
+  await page.locator('[data-action="practice-answer"]').nth(practiceCorrect).click();
   await page.getByRole("heading", { name: "理解正确", exact: true }).waitFor();
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 390, height: 844 });

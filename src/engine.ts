@@ -61,6 +61,15 @@ export interface EnemyAction {
   damage: number;
   blocked: number;
 }
+export interface AttackHit {
+  targetId: string;
+  damage: number;
+  blocked: number;
+  hpBefore: number;
+  hpAfter: number;
+  blockBefore: number;
+  blockAfter: number;
+}
 export interface Battle {
   turn: number;
   enemies: Enemy[];
@@ -74,8 +83,9 @@ export interface Battle {
   log: string[];
   room: RoomKind;
   sequence?: string[];
-  lab?: { caseId: string; choice: number | null; transfer: number | null; order?: number[]; transferOrder?: number[] };
+  lab?: { caseId: string; choice: number | null; transfer: number | null; order?: number[]; transferOrder?: number[]; beginnerTransfer?: boolean };
   enemyActions?: EnemyAction[];
+  attackHits?: AttackHit[];
   cardsPlayed?: number;
   burstUsed?: boolean;
   ward?: boolean;
@@ -120,7 +130,8 @@ export interface Run {
     selected: number | null;
     correct: boolean | null;
     boss: boolean;
-    trial?: { id: string; step: number; answers: number[]; reward: TrialReward | null; order?: number[]; optionOrders?: number[][]; revision?: number };
+    beginnerQuestion?: string;
+    trial?: { id: string; step: number; answers: number[]; reward: TrialReward | null; order?: number[]; optionOrders?: number[][]; revision?: number; introOverrides?: (string | null)[] };
   } | null;
   reward: { cards: Card[]; gold: number; relic: RelicId | null } | null;
   roomDone: boolean;
@@ -432,6 +443,13 @@ function hurt(
 function heal(run: Run, amount: number): void {
   run.player.hp = Math.min(run.player.maxHp, run.player.hp + amount);
 }
+function strikeEnemy(run: Run, enemy: Enemy, amount: number): void {
+  const hpBefore = enemy.hp, blockBefore = enemy.block;
+  hurt(enemy, amount, bossHpFloor(enemy));
+  (run.battle!.attackHits ??= []).push({ targetId: enemy.id,
+    damage: hpBefore - enemy.hp, blocked: blockBefore - enemy.block,
+    hpBefore, hpAfter: enemy.hp, blockBefore, blockAfter: enemy.block });
+}
 function damagePlayer(run: Run, amount: number): void {
   if (amount > 0 && run.battle!.ward) {
     run.battle!.ward = false;
@@ -484,6 +502,7 @@ export function useReset(input: Run): Run {
   run.player.resetCharges = 0;
   heal(run, run.player.maxHp);
   run.battle!.enemyActions = [];
+  run.battle!.attackHits = [];
   addLog(run, "重置：回复全部生命，本幕额度已用完。");
   return run;
 }
@@ -501,6 +520,7 @@ export function takeBossBait(input: Run): Run {
   enemy.hp = Math.min(enemy.maxHp, enemy.hp + 20);
   run.player.energy += 2;
   run.battle!.enemyActions = [];
+  run.battle!.attackHits = [];
   addLog(run, "领取诱饵：能量 +2；首领回复 20 生命，所有后续攻击 +3。");
   return run;
 }
@@ -519,6 +539,7 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
   const run = clone(input);
   const battle = run.battle!;
   battle.enemyActions = [];
+  battle.attackHits = [];
   const p = run.player;
   const enemy = battle.enemies.find((e) => e.id === targetId)!;
   const hpBefore = new Map(battle.enemies.map(e => [e.id, e.hp]));
@@ -535,7 +556,7 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
     const amount = Math.floor(
       (d.damage + p.strength + synergy.damage + burst) * (p.weak > 0 ? 0.75 : 1),
     );
-    for (let hit = 0; hit < (d.hits ?? (d.special === "echo" ? 2 : 1)) && enemy.hp > 0; hit++) hurt(enemy, bossCardDamage(run, enemy, d, amount), bossHpFloor(enemy));
+    for (let hit = 0; hit < (d.hits ?? (d.special === "echo" ? 2 : 1)) && enemy.hp > 0; hit++) strikeEnemy(run, enemy, bossCardDamage(run, enemy, d, amount));
   }
   p.block += (d.block ?? 0) + synergy.block;
   p.energy += (d.energy ?? 0) + synergy.energy;
@@ -565,7 +586,14 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
   else battle.discard.push(card);
   if (d.purge) run.deck = run.deck.filter(c => c.uid !== card.uid);
   const counter = afterBossCard(run, d, hpBefore);
-  if (counter) { damagePlayer(run, counter); addLog(run, `原样重试：首领反击 ${counter} 点。`); }
+  if (counter) {
+    const hp = p.hp, block = p.block;
+    damagePlayer(run, counter);
+    const attacker = battle.enemies.find(e => e.hp > 0 && e.boss?.kind === "recovery")!;
+    battle.enemyActions!.push({ enemyId: attacker.id, kind: "attack", value: counter,
+      damage: hp - p.hp, blocked: block - p.block });
+    addLog(run, `原样重试：首领反击 ${counter} 点。`);
+  }
   addLog(
     run,
     `打出「${d.name}${card.upgraded ? "+" : ""}」${target ? ` → ${target.name}` : ""}。`,
@@ -580,6 +608,7 @@ export function endTurn(input: Run): Run {
   const b = run.battle!;
   const p = run.player;
   b.enemyActions = [];
+  b.attackHits = [];
   b.discard.push(...b.hand.filter(c => !statsFor(c).retain));
   b.hand = b.hand.filter(c => statsFor(c).retain);
   p.weak = Math.max(0, p.weak - 1);
@@ -653,6 +682,7 @@ export function answerLab(input: Run, choice: number): Run {
     transfer: null,
   });
   run.battle!.enemyActions = [];
+  run.battle!.attackHits = [];
   if (lab.choice === null) {
     lab.choice = choice;
     if (choice === scenario.correct) {
@@ -696,12 +726,13 @@ export function usePotion(input: Run, index: number, targetId?: string): Run {
   if (potion === "fire" && !target) return input;
   const run = clone(input);
   run.battle!.enemyActions = [];
+  run.battle!.attackHits = [];
   run.player.potions.splice(index, 1);
   if (potion === "heal") heal(run, 20);
   if (potion === "energy") run.player.energy += 2;
   if (potion === "fire") {
     const enemy = run.battle!.enemies.find((e) => e.id === targetId)!;
-    hurt(enemy, 20, bossHpFloor(enemy));
+    strikeEnemy(run, enemy, 20);
   }
   addLog(run, "使用了一瓶药水。");
   rewardVictory(run);
@@ -739,7 +770,7 @@ function startQuiz(run: Run, boss: boolean): void {
   const optionOrders = order.map(() => shuffle(run, [0,1,2]));
   run.screen = "quiz";
   run.quiz = { lessonId: trial.questions[order[0]].lessonId, selected: null, correct: null, boss,
-    trial: { id: trial.id, step: 0, answers: [], reward: null, order, optionOrders, revision: 2 } };
+    trial: { id: trial.id, step: 0, answers: [], reward: null, order, optionOrders, revision: 3 } };
 }
 export function chooseReward(input: Run, uid: string | null): Run {
   if (input.screen !== "reward" || !input.reward) return input;

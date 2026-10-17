@@ -1,6 +1,7 @@
 import { LESSON_BY_ID } from "./content";
 import type { LearningCase } from "./learning-cases";
 import type { TrialQuestion } from "./trials";
+import { practiceQuestion } from "./beginner-content";
 
 export interface LearningHint { focus: string; method: string }
 
@@ -157,17 +158,20 @@ const CODE_METHOD = "先区分代码现在做了什么和题设要求它做到�
 const CONCEPT_METHOD = "先明确题目在比较的维度，再用一个具体例子检验每种说法是否满足题设。";
 
 export function practiceHint(lessonId: string): LearningHint {
-  return { focus: LESSON_HINTS[lessonId], method: CONCEPT_METHOD };
+  return { focus: practiceQuestion(lessonId).hint, method: "先读上方小知识，再找场景里的关键条件。" };
 }
 
 // Deliberately accepts no answer, option or explanation fields.
-export function trialHint(question: Pick<TrialQuestion, "id" | "lessonId" | "title" | "code">): LearningHint {
-  const focus = (question.id && EXERCISE_HINTS[question.id]) ||
+export function trialHint(question: Pick<TrialQuestion, "id" | "lessonId" | "title" | "code" | "hint" | "level">): LearningHint {
+  const focus = question.hint || (question.id && EXERCISE_HINTS[question.id]) ||
     LEGACY_HINTS[`${question.lessonId}/${question.title}`] || LESSON_HINTS[question.lessonId];
-  return { focus, method: question.code ? CODE_METHOD : CONCEPT_METHOD };
+  return { focus, method: question.level === "beginner" ? "先读上方小知识，再找场景里的关键条件。" : question.code ? CODE_METHOD : CONCEPT_METHOD };
 }
 
 export function caseHint(c: LearningCase, phase: "action" | "transfer"): LearningHint {
+  if (c.level === "beginner" || (phase === "transfer" && c.transfer?.level === "beginner"))
+    return {focus:phase === "transfer" ? c.transfer?.hint ?? c.hint! : c.hint!,
+      method:"先读上方小知识，再想一想哪一步能帮助完成眼前的任务。"};
   const id = c.id.replace(/^code-v2-/, "");
   const focus = EXERCISE_HINTS[id] ?? `围绕「${LESSON_BY_ID[c.lesson].title}」，先列出题设证据和当前动作真正读取的信息，再与任务的限制逐项核对。`;
   return {

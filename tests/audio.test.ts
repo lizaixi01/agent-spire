@@ -1,17 +1,30 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GameAudio } from "../src/audio";
+import type { Impact } from "../src/impact";
 
 function audioDevice() {
   const tones: { stop: ReturnType<typeof vi.fn> }[] = [];
+  const percussion: { stop: ReturnType<typeof vi.fn>; start: ReturnType<typeof vi.fn> }[] = [];
   const parameter = () => ({
     value: 0,
     setValueAtTime: vi.fn(),
     exponentialRampToValueAtTime: vi.fn(),
+    linearRampToValueAtTime: vi.fn(),
+    cancelScheduledValues: vi.fn(),
   });
   const context = {
     currentTime: 0,
     state: "suspended",
     destination: {},
+    sampleRate: 48000,
+    createWaveShaper: () => ({ curve: null, oversample: "none", connect: vi.fn() }),
+    createBuffer: (_channels: number, length: number) => ({ getChannelData: () => new Float32Array(length) }),
+    createBufferSource: () => {
+      const node = { buffer: null, connect: vi.fn(), disconnect: vi.fn(), start: vi.fn(), stop: vi.fn(), onended: null };
+      percussion.push(node); return node;
+    },
+    createBiquadFilter: () => ({ type: "bandpass", frequency: parameter(), Q: parameter(), connect: vi.fn(), disconnect: vi.fn() }),
+    createDynamicsCompressor: vi.fn(() => ({ threshold: parameter(), knee: parameter(), ratio: parameter(), attack: parameter(), release: parameter(), connect: vi.fn() })),
     resume: vi.fn(async () => {
       context.state = "running";
     }),
@@ -38,7 +51,7 @@ function audioDevice() {
     },
   };
   const create = vi.fn(() => context as unknown as AudioContext);
-  return { context, create, tones };
+  return { context, create, tones, percussion };
 }
 afterEach(() => vi.useRealTimers());
 
@@ -107,6 +120,17 @@ describe("游戏音乐与音效", () => {
     expect(counts.every(n => n >= 2)).toBe(true);
     expect(counts[5]).toBeGreaterThan(counts[0]);
     expect(counts[1]).toBeGreaterThanOrEqual(4);
+    audio.dispose();
+  });
+  it("三段打击的冲击声在对应命中时间播放，并在静音时取消尚未播放的声音", async () => {
+    const device = audioDevice();
+    const audio = new GameAudio({ music: false, effects: true, volume: .3 }, device.create);
+    await audio.unlock();
+    audio.combat({ beats: [120, 240, 360].map(at => ({ at, cue: "impact", damage: 3 })), cue: "impact" } as Impact);
+    expect(device.percussion.map(p => p.start.mock.calls[0][0])).toEqual([.12, .24, .36]);
+    expect(device.context.createDynamicsCompressor).toHaveBeenCalledOnce();
+    await audio.configure({ music: false, effects: false, volume: .3 });
+    expect(device.percussion.every(p => p.stop.mock.calls.length >= 2)).toBe(true);
     audio.dispose();
   });
 });

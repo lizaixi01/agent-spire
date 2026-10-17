@@ -3,6 +3,7 @@ import { LEGACY_TRIALS } from "./trial-bank-v1";
 import { LESSON_BY_ID } from "./content";
 import type { Run } from "./engine";
 import { rewardRelics, type RelicId } from "./cards";
+import { BEGINNER_TRIALS, BEGINNER_BY_ID } from "./beginner-content";
 
 export interface TrialQuestion {
   id?: string;
@@ -19,6 +20,10 @@ export interface TrialQuestion {
   options: string[];
   correct: number;
   explanation: string;
+  level?: "beginner";
+  intro?: string;
+  scene?: string;
+  hint?: string;
 }
 export interface EngineeringQuestion extends TrialQuestion {
   id: string;
@@ -34,26 +39,30 @@ export interface TrialReward {
 }
 export interface Trial {
   id: string;
-  topic: "checkpoint" | "memory" | "compaction" | "engineering";
+  topic: "checkpoint" | "memory" | "compaction" | "engineering" | "beginner";
   title: string;
   questions: TrialQuestion[];
 }
-export const TRIALS: Trial[] = ENGINEERING_TRIALS;
-export const TRIAL_BY_ID = Object.fromEntries(TRIALS.map(t => [t.id, t])) as Record<string, Trial>;
+export const TRIALS: Trial[] = BEGINNER_TRIALS;
+export const TRIAL_BY_ID = Object.fromEntries([...ENGINEERING_TRIALS,...BEGINNER_TRIALS].map(t => [t.id, t])) as Record<string, Trial>;
+const ENGINEERING_BY_ID = Object.fromEntries(ENGINEERING_TRIALS.map(t => [t.id,t])) as Record<string,Trial>;
+const BEGINNER_TRIAL_BY_ID = Object.fromEntries(BEGINNER_TRIALS.map(t => [t.id,t])) as Record<string,Trial>;
 const LEGACY_BY_ID = Object.fromEntries(LEGACY_TRIALS.map(t => [t.id,t])) as Record<string,Trial>;
 export function trialDefinition(quiz: NonNullable<Run["quiz"]>): Trial {
   const t=quiz.trial!;
-  return (t.revision === 2 ? TRIAL_BY_ID : LEGACY_BY_ID)[t.id];
+  return (t.revision === 3 ? BEGINNER_TRIAL_BY_ID : t.revision === 2 ? ENGINEERING_BY_ID : LEGACY_BY_ID)[t.id];
 }
 export function trialQuestionAt(quiz: NonNullable<Run["quiz"]>, step: number): TrialQuestion {
   const t = quiz.trial!;
-  const original = trialDefinition(quiz).questions[t.order?.[step] ?? step];
+  const override = t.introOverrides?.[step];
+  const original = override ? BEGINNER_BY_ID[override] : trialDefinition(quiz).questions[t.order?.[step] ?? step];
   const order = t.optionOrders?.[step] ?? [0,1,2];
   return {...original, options: order.map(i=>original.options[i]), correct: order.indexOf(original.correct),
     optionReasons: original.optionReasons ? order.map(i=>original.optionReasons![i]) : undefined};
 }
 export function trialQuestion(quiz: NonNullable<Run["quiz"]>): TrialQuestion {
   if (quiz.trial) return trialQuestionAt(quiz,quiz.trial.step);
+  if (quiz.beginnerQuestion) return BEGINNER_BY_ID[quiz.beginnerQuestion];
   const l = LESSON_BY_ID[quiz.lessonId];
   return { ...l, lessonId: l.id, code: "" };
 }

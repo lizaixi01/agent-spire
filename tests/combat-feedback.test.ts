@@ -1,7 +1,8 @@
 import { readyForCards } from "./fixtures";
 import { describe, expect, it } from "vitest";
-import { createRun, enterNode, availableNodes, playCard } from "../src/engine";
+import { createRun, enterNode, availableNodes, playCard, answerLab } from "../src/engine";
 import { combatFeedback } from "../src/combat-feedback";
+import { caseForBattle, transferFor } from "../src/learning-cases";
 
 function fight() {
   const run = createRun("scholar", 42);
@@ -14,6 +15,21 @@ function fight() {
   return started;
 }
 describe("出牌反馈反映实际结果", () => {
+  it("工程决策的额外能量、抽牌、金币与掌握均显示到账，重复点击不重播奖励", () => {
+    const map = createRun("weaver", 42), run = enterNode(map, availableNodes(map)[0].id);
+    run.battle!.drawPile = [{ uid: "bonus", defId: "defend", upgraded: false }];
+    const scenario = caseForBattle(run), first = answerLab(run, scenario.correct);
+    expect(combatFeedback(run, first)).toEqual(expect.arrayContaining([
+      { target: "player", kind: "energy", text: "能量 +1" },
+      { target: "player", kind: "draw", text: "抽牌 +1" },
+    ]));
+    const second = answerLab(first, transferFor(scenario).correct);
+    expect(combatFeedback(first, second)).toEqual(expect.arrayContaining([
+      { target: "player", kind: "gold", text: "+10 金币" },
+      { target: "player", kind: "mastery", text: "掌握 +1" },
+    ]));
+    expect(combatFeedback(second, answerLab(second, transferFor(scenario).correct))).toEqual([]);
+  });
   it("伤害与吸收分别显示真实数值，不把牌面伤害当作掉血", () => {
     const before = fight();
     const enemy = before.battle!.enemies[0];

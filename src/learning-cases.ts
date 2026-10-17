@@ -1,6 +1,7 @@
 import type { Run } from "./engine";
 import { LESSON_BY_ID } from "./content";
 import { ENGINEERING_TRIALS } from "./trial-bank";
+import { BEGINNER_QUESTIONS, practiceQuestion, type BeginnerQuestion } from "./beginner-content";
 
 export interface LearningCase {
   id: string;
@@ -11,6 +12,9 @@ export interface LearningCase {
   correct: number;
   consequences: [string, string, string];
   codeLanguage?: "python";
+  level?: "beginner";
+  intro?: string;
+  hint?: string;
   source?: { chapter: number; section: string; page: number };
   transfer?: Transfer;
 }
@@ -274,7 +278,7 @@ export const CASES: LearningCase[] = [
     ],
   ),
 ];
-// Keep old IDs intact for saved battles; new battles choose code exercises only.
+// Keep old IDs and answer indices intact for already-answered saved battles.
 for (const trial of ENGINEERING_TRIALS) for (const q of trial.questions) {
   const proposal = (q.correct + 1) % 3;
   CASES.push({
@@ -289,6 +293,22 @@ for (const trial of ENGINEERING_TRIALS) for (const q of trial.questions) {
     },
   });
 }
+function beginnerTransfer(q: BeginnerQuestion): Transfer {
+  return { question:q.question, evidence:q.scene, intro:q.intro, level:"beginner", hint:q.hint,
+    code:"", options:q.options, correct:q.correct, explanation:q.explanation };
+}
+for (const q of BEGINNER_QUESTIONS) {
+  const next = BEGINNER_QUESTIONS.find(other => other.lessonId === q.lessonId && other.id !== q.id);
+  const lesson = LESSON_BY_ID[q.lessonId];
+  const transfer = next ? beginnerTransfer(next) : {
+    question:lesson.question, evidence:"用刚才的小知识，再做一次简单判断。", intro:q.intro, level:"beginner" as const,
+    hint:"对照上方小知识，想一想哪种说法解释了刚才的做法。", code:"", options:lesson.options,
+    correct:lesson.correct, explanation:lesson.explanation,
+  };
+  CASES.push({id:`beginner-${q.id}`,lesson:q.lessonId,situation:q.question,evidence:q.scene,
+    level:"beginner",intro:q.intro,hint:q.hint,options:q.options as LearningCase["options"],correct:q.correct,
+    consequences:q.optionReasons,source:{chapter:q.chapter,section:q.section,page:q.page},transfer});
+}
 export const CASE_BY_ID = Object.fromEntries(
   CASES.map((c) => [c.id, c]),
 ) as Record<string, LearningCase>;
@@ -299,6 +319,10 @@ interface Transfer {
   explanation: string;
   code?: string;
   codeLanguage?: "python";
+  level?: "beginner";
+  intro?: string;
+  evidence?: string;
+  hint?: string;
 }
 const transfers: Record<string, Transfer> = {
   "missing-file": {
@@ -452,6 +476,7 @@ const transfers: Record<string, Transfer> = {
 export const transferFor = (c: LearningCase): Transfer =>
   c.transfer ?? transfers[c.id] ?? LESSON_BY_ID[c.lesson];
 function orderedCase(c: LearningCase, lab: NonNullable<Run["battle"]>["lab"]): LearningCase {
+  if (lab?.beginnerTransfer) c = {...c,transfer:beginnerTransfer(practiceQuestion(c.lesson))};
   if (!lab?.order) return c;
   const order = lab.order;
   const transfer = transferFor(c), second = lab.transferOrder ?? [0,1,2];
@@ -465,7 +490,7 @@ export function caseForBattle(run: Run): LearningCase {
   if (saved && Object.hasOwn(CASE_BY_ID, saved)) return orderedCase(CASE_BY_ID[saved],run.battle?.lab);
   const node = run.map.find((n) => n.id === run.position);
   const chapter = node ? LESSON_BY_ID[node.lessonId].chapter : run.act;
-  const matching = CASES.filter(c => c.codeLanguage === "python" && LESSON_BY_ID[c.lesson].chapter === chapter);
+  const matching = CASES.filter(c => c.level === "beginner" && LESSON_BY_ID[c.lesson].chapter === chapter);
   const unseen = matching.filter(c => !run.encounteredCases?.includes(c.id));
   const pool = unseen.length ? unseen : matching.filter(c=>c.id!==run.encounteredCases?.at(-1));
   return pool[

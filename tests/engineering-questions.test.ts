@@ -4,17 +4,18 @@ import { availableNodes, enterNode, type Run } from "../src/engine";
 import { decodeRun, encodeRun } from "../src/save";
 import { TRIALS, trialQuestion, trialQuestionAt } from "../src/trials";
 import { chapterRun } from "./fixtures";
+import { ENGINEERING_TRIALS } from "../src/trial-bank";
 
 const topics = new Set(["checkpoint", "memory", "compaction"]);
 
 describe("有工程区分度的实现试炼", () => {
   it("三主题各有代码追踪、排错和取舍题；每个干扰项有独立原因", () => {
     for (const topic of topics) {
-      const questions = TRIALS.filter(t => t.topic === topic).flatMap(t => t.questions);
+      const questions = ENGINEERING_TRIALS.filter(t => t.topic === topic).flatMap(t => t.questions);
       expect(questions.length).toBeGreaterThanOrEqual(12);
       expect(new Set(questions.map(q => q.kind))).toEqual(new Set(["trace", "debug", "tradeoff"]));
     }
-    for (const question of TRIALS.flatMap(t=>t.questions)) {
+    for (const question of ENGINEERING_TRIALS.flatMap(t=>t.questions)) {
       expect(question.code).not.toContain("???");
       expect(question.code.split("\n").length).toBeGreaterThanOrEqual(4);
       expect(question.optionReasons).toHaveLength(3);
@@ -32,7 +33,7 @@ describe("有工程区分度的实现试炼", () => {
       " with contextlib.redirect_stdout(out): exec(compile(item['code'],item['id'],'exec'),{})",
       " result[item['id']]=out.getvalue().strip()",
       "print(json.dumps(result,ensure_ascii=False))",
-    ].join("\n")], { input: JSON.stringify(TRIALS.flatMap(t=>t.questions)), encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" }, timeout: 10000 }));
+    ].join("\n")], { input: JSON.stringify(ENGINEERING_TRIALS.flatMap(t=>t.questions)), encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" }, timeout: 10000 }));
     expect(outputs["checkpoint-boundary"]).toBe("4");
     expect(outputs["checkpoint-alias"]).toBe("2 2");
     expect(outputs["memory-late-arrival"]).toBe("Beijing");
@@ -45,12 +46,12 @@ describe("有工程区分度的实现试炼", () => {
     expect(outputs["compaction-prefix"]).toBe("2");
   });
 
-  it("新试炼只抽工程题；选项重排时理由跟随选项，作答前不改变掌握度", () => {
+  it("新试炼抽入门题；选项重排时理由跟随选项，作答前不改变掌握度", () => {
     for (let seed = 1; seed <= 12; seed++) {
       const start = chapterRun("scholar", seed,3), node = availableNodes(start)[0];
       node.kind = "quiz"; node.lessonId = "memory";
       const run = enterNode(start,node.id);
-      expect(run.quiz!.trial!.revision).toBe(2);
+      expect(run.quiz!.trial!.revision).toBe(3);
       expect(run.mastery).toEqual({});
       for (let step = 0; step < 3; step++) {
         const q = trialQuestionAt(run.quiz!,step);

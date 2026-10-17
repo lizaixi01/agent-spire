@@ -1,4 +1,5 @@
 async function polishUI(page) {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.addInitScript(() => {
@@ -76,6 +77,10 @@ async function polishUI(page) {
   // Focused visual fixture: expose the combo cards without altering character rules.
   await page.evaluate(() => {
     const r=JSON.parse(localStorage.getItem('agent-spire.run.v1'));
+    if (!r.deck.some(c => c.defId === 'react')) {
+      const card = { uid: 'polish-react', defId: 'react', upgraded: false };
+      r.deck.push(card); r.battle.hand.push({...card});
+    }
     for(const id of ['observe','react','strike','strike']) {
       const index=r.battle.drawPile.findIndex(c=>c.defId===id);
       if(index>=0)r.battle.hand.push(...r.battle.drawPile.splice(index,1));
@@ -83,18 +88,26 @@ async function polishUI(page) {
     localStorage.setItem('agent-spire.run.v1',JSON.stringify(r));
   });
   await page.reload(); await page.getByRole('button',{name:'继续学习',exact:true}).click();
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
+  for (let step = 0; step < 2; step++) {
+    const answer = await page.evaluate(async () => {
+      const { caseForBattle, transferFor } = await import('/src/learning-cases.ts');
+      const run = JSON.parse(localStorage.getItem('agent-spire.run.v1'));
+      const c = caseForBattle(run);
+      return run.battle.lab.choice === null ? c.correct : transferFor(c).correct;
+    });
+    await page.locator('[data-action="lab-choice"]').nth(answer).click();
+  }
   await page
     .getByRole("button", { name: "环境观测，0能量，抽 1 张牌。", exact: true })
     .click();
-  await page.locator(".fx-number.draw").waitFor();
+  await page.locator(".fx-number.draw").last().waitFor();
   await page.getByRole("button", { name: /思考 · 行动，1能量/ }).click();
   await page.locator(".fx-number.damage").waitFor();
   if (
     !(await page.locator(".fx-number.damage").last().innerText()).includes("14")
   )
     throw new Error("Combo effect does not show actual damage");
+  await page.waitForFunction(() => document.querySelector('.enemy-health')?.textContent?.includes('26 / 40'));
   if (!(await page.locator(".enemy-health").innerText()).includes("26 / 40"))
     throw new Error("VFX changed combat rules");
   await page.screenshot({ path: "output/polish-card-impact.png" });
@@ -119,9 +132,10 @@ async function polishUI(page) {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.getByRole("button", { name: "设置与来源", exact: true }).click();
   if (
-    await page
-      .locator(".combat-fx")
-      .evaluate((element) => getComputedStyle(element).visibility !== "hidden")
+    await page.evaluate(() => {
+      const layer = document.querySelector('.combat-fx');
+      return layer !== null && getComputedStyle(layer).visibility !== 'hidden';
+    })
   )
     throw new Error("Combat effects cover settings dialog");
   await page.getByRole("button", { name: "关闭音乐", exact: true }).click();

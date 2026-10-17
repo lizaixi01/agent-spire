@@ -34,3 +34,15 @@ CI 在每次推送及 PR 执行测试、类型检查、构建与体积检查，�
 在线版和本地版属于不同站点，存档各自保存在当前浏览器，不会自动同步。GitHub Pages 上同一域名的其他项目共享浏览器 origin，后续项目应避免复用本游戏的存档键。
 
 部署后检查首页、全部静态资源及字体无 404，实际走通选角、进入战斗、作答、出牌、刷新恢复，并检查手机布局。自动构建成功不等于在线验收完成。
+
+## 版本一致性约定
+
+每次统一发布递增 package.json 与 lockfile 版本；界面版本号直接读取 package.json，避免手工维护第二份版本。两个构建入口均运行 scripts/build-info.mjs，将版本、完整 Git 提交和未提交状态写入忽略的 public/build-info.json，再进入各自构建目录。无 Git 的源码 ZIP 可正常构建，提交与未提交状态明确为 null，不冒充已知提交。
+
+发布前先提交并通过全量测试、网页与游玩包浏览器验收。最后等待该提交的 CI 和 Pages 部署通过，下载同一运行的 player-package 构建产物作为发布附件，再创建指向同一提交的版本标签及 Release。避免本地其他窗口的后续写入混进构建。上传游玩 ZIP、SHA256SUMS.txt、RELEASE-MANIFEST.json；清单自动记录版本、提交、精确字节和 ZIP 哈希。旧版附件保留在原 Release。
+
+Checks 针对同一个 ref 取消旧运行，避免较早提交的慢构建在新提交后覆盖 Pages。
+
+完成条件：GitHub main、标签、在线 build-info.json、ZIP 内 dist/build-info.json 与 RELEASE-MANIFEST.json 的提交和版本一致，uncommitted=false，远端附件哈希匹配本地；README 的版本与下载入口一致。仅看文件名或部署成功不能证明版本已同步。
+
+发布后运行 `python scripts/verify-release.py --directory <下载的构建产物目录>`。此检查使用已登录的 gh 和公网 HTTPS，核对主分支、版本标签、最新 Release、在线构建信息、包内信息、上传哈希、校验文件和 10 MiB 限制；任意不一致均失败。

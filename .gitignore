@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-pages/
+public/build-info.json
 output/
 reference/
 release/

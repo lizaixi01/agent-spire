@@ -14,14 +14,14 @@ function trial() {
   result.player.potions = ["heal", "energy"];
   return result;
 }
-describe("实现型知识试炼", () => {
-  it("三步实现题逐题解释、不能跳题或重复刷奖励，重载保留进度", () => {
+describe("入门知识试炼", () => {
+  it("三步场景题逐题解释、不能跳题或重复刷奖励，重载保留进度", () => {
     let run = trial();
     expect(run.quiz!.trial).toBeDefined();
     expect(finishQuiz(run)).toBe(run);
     for (let i = 0; i < 3; i++) {
       const q = trialQuestion(run.quiz!);
-      expect(q.code).toBeTruthy();
+      expect(q.level).toBe("beginner"); expect(q.intro).toBeTruthy(); expect(q.code).toBe("");
       run = answerQuiz(run, q.correct);
       expect(run.player.gold).toBe(99);
       expect(answerQuiz(run, q.correct)).toBe(run);
@@ -51,9 +51,9 @@ describe("实现型知识试炼", () => {
       expect(result.player.potions.length - run.player.potions.length).toBe(correctCount === 2 ? 1 : 0);
     }
   });
-  it("至少四十二道实现题覆盖十章，包含检查点、记忆和压缩并可定位原文", () => {
-    expect(TRIALS.flatMap(t => t.questions).filter(q=>q.code).length).toBeGreaterThanOrEqual(42);
-    expect(new Set(TRIALS.map(t => t.topic))).toEqual(new Set(["checkpoint", "memory", "compaction", "engineering"]));
+  it("六十道入门场景题覆盖十章，每章两套试炼并可定位原文", () => {
+    expect(TRIALS.flatMap(t => t.questions)).toHaveLength(60);
+    expect(new Set(TRIALS.map(t => t.topic))).toEqual(new Set(["beginner"]));
     for (const t of TRIALS) for (const q of t.questions) {
       expect(q.options).toHaveLength(3);
       expect(q.explanation).toBeTruthy();

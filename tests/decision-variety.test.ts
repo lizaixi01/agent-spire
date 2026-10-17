@@ -15,7 +15,7 @@ describe("战斗侧栏的工程决策题池", () => {
         run=enterNode(ready,availableNodes(ready)[0].id);
         const c=caseForBattle(run), transfer=transferFor(c);
         expect(LESSON_BY_ID[c.lesson].chapter).toBe(chapter);
-        expect(transfer.code).toBeTruthy();
+        expect(transfer.level).toBe("beginner"); expect(transfer.evidence).toBeTruthy();
         questions.add(c.situation);evidence.add(c.evidence);
         const restored=decodeRun(encodeRun(run))!;
         expect(caseForBattle(restored)).toEqual(c);
@@ -26,14 +26,14 @@ describe("战斗侧栏的工程决策题池", () => {
       expect(evidence.size,`chapter ${chapter}`).toBe(6);
     }
   });
-  it("新侧栏题包含可读代码，旧 caseId 仍可恢复", () => {
+  it("新侧栏题包含入门讲解，旧 caseId 的未答内容接入入门", () => {
     for(let chapter=1;chapter<=10;chapter++)
-      expect(CASES.filter(c=>c.codeLanguage==="python" && LESSON_BY_ID[c.lesson].chapter===chapter).length).toBeGreaterThanOrEqual(6);
+      expect(CASES.filter(c=>c.level==="beginner" && LESSON_BY_ID[c.lesson].chapter===chapter).length).toBeGreaterThanOrEqual(6);
     const run=chapterRun("scholar",42);
     const entered=enterNode(run,availableNodes(run)[0].id);
     entered.battle!.lab={caseId:"missing-file",choice:null,transfer:null};
     const restored=decodeRun(encodeRun(entered));
     expect(restored).not.toBeNull();
-    expect(caseForBattle(restored!).evidence).toContain("不存在");
+    expect(caseForBattle(restored!).level).toBe("beginner");
   });
 });

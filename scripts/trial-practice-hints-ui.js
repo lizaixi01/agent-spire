@@ -5,6 +5,7 @@ async page => {
   const fixtures=await page.evaluate(async()=>{
     const e=await import('/src/engine.ts'), c=await import('/src/content.ts');
     const t=await import('/src/trials.ts'), h=await import('/src/learning-hints.ts');
+    const b=await import('/src/beginner-content.ts'), s=await import('/src/save.ts');
     const trials=[]; let map=e.createRun('scholar',23);
     for(let chapter=1;chapter<=10;chapter++){
       const start=structuredClone(map), node=e.availableNodes(start)[0]; node.kind='quiz';
@@ -16,8 +17,8 @@ async page => {
     legacy.quiz={lessonId:'memory',selected:null,correct:null,boss:false,trial:{id:'checkpoint-write',revision:1,step:0,answers:[],reward:null,order:[1,0,2],optionOrders:[[2,0,1],[1,2,0],[0,1,2]]}};
     const single=structuredClone(trials[1].run);
     single.quiz={lessonId:'skills',selected:null,correct:null,boss:false};
-    return {trials,old:[legacy,single].map(run=>({run,hint:h.trialHint(t.trialQuestion(run.quiz))})),
-      lessons:c.LESSONS.map(l=>({...l,hint:h.practiceHint(l.id)}))};
+    return {trials,old:[legacy,single].map(raw=>{const run=s.decodeRun(JSON.stringify(raw));return {run,hint:h.trialHint(t.trialQuestion(run.quiz))};}),
+      lessons:c.LESSONS.map(l=>({...l,...b.practiceQuestion(l.id),id:l.id,hint:h.practiceHint(l.id)}))};
   });
   await page.goto('http://127.0.0.1:4173/');
   const snapshot=()=>page.evaluate(()=>JSON.stringify([localStorage.getItem('agent-spire.run.v1'),localStorage.getItem('agent-spire.knowledge.v1')]));

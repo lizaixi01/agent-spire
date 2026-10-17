@@ -19,11 +19,11 @@ function fight(character: CharacterId = "scholar") {
   return enterNode(r, availableNodes(r)[0].id);
 }
 describe("在战斗中应用并迁移原书原理", () => {
-  it("首战随机使用本章代码案例，两步判断完成后才获得掌握度", () => {
+  it("首战随机使用本章入门案例，两步判断完成后才获得掌握度", () => {
     const r = fight();
     const c = caseForBattle(r);
     expect(LESSON_BY_ID[c.lesson].chapter).toBe(1);
-    expect(c.codeLanguage).toBe("python");
+    expect(c.level).toBe("beginner"); expect(c.intro).toBeTruthy();
     const first = answerLab(r, c.correct);
     expect(first.player.energy).toBe(r.player.energy + 1);
     expect(first.mastery[c.lesson] ?? 0).toBe(0);

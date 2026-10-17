@@ -10,6 +10,8 @@ export interface CombatFeedback {
     | "absorb"
     | "draw"
     | "energy"
+    | "gold"
+    | "mastery"
     | "power"
     | "status";
   text: string;
@@ -41,20 +43,24 @@ export function combatFeedback(
   }
   const p = before.player;
   const n = after.player;
-  if (n.hp < p.hp) add("player", "damage", `−${p.hp - n.hp}`);
-  if (n.hp > p.hp) add("player", "heal", `+${n.hp - p.hp} 生命`);
+  const incomingDamage = (after.battle.enemyActions ?? []).reduce((sum, action) => sum + action.damage, 0);
+  const healed = n.hp - p.hp + incomingDamage;
+  if (incomingDamage || n.hp < p.hp) add("player", "damage", `−${incomingDamage || p.hp - n.hp}`);
+  if (healed > 0) add("player", "heal", `+${healed} 生命`);
   const absorbed = (after.battle.enemyActions ?? []).reduce((sum, action) => sum + action.blocked, 0);
   if (absorbed) add("player", "absorb", `格挡 ${absorbed}`);
   if (n.block > p.block) add("player", "block", `+${n.block - p.block} 格挡`);
   if (n.weak > p.weak) add("player", "status", `虚弱 +${n.weak - p.weak}`);
-  if (card) {
-    const d = statsFor(card);
-    const draw = after.battle.hand.filter(
+  const draw = after.battle.hand.filter(
       (c) => !before.battle!.hand.some((old) => old.uid === c.uid),
     ).length;
-    if (draw) add("player", "draw", `抽牌 +${draw}`);
-    const energy = n.energy - p.energy + d.cost;
-    if (energy > 0) add("player", "energy", `能量 +${energy}`);
+  if (draw) add("player", "draw", `抽牌 +${draw}`);
+  const energy = n.energy - p.energy + (card ? statsFor(card).cost : 0);
+  if (energy > 0) add("player", "energy", `能量 +${energy}`);
+  if (n.gold > p.gold) add("player", "gold", `+${n.gold - p.gold} 金币`);
+  const mastery = Object.entries(after.mastery).reduce((sum, [id, value]) => sum + Math.max(0, value - (before.mastery[id] ?? 0)), 0);
+  if (mastery) add("player", "mastery", `掌握 +${mastery}`);
+  if (card) {
     if (n.strength > p.strength)
       add("player", "power", `力量 +${n.strength - p.strength}`);
     if (after.battle.cache > before.battle.cache)

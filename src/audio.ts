@@ -1,3 +1,4 @@
+import type { Impact } from "./impact";
 export interface AudioSettings {
   music: boolean;
   effects: boolean;
@@ -55,7 +56,9 @@ export class GameAudio {
   private next = 0;
   private step = 0;
   private musicNotes = new Set<OscillatorNode>();
-  private effectNotes = new Set<OscillatorNode>();
+  private effectNotes = new Set<AudioScheduledSourceNode>();
+  private noiseBuffer: AudioBuffer | null = null;
+  private duckUntil = 0;
 
   constructor(
     settings: AudioSettings,
@@ -92,11 +95,27 @@ export class GameAudio {
         this.context = this.createContext();
         this.musicBus = this.context.createGain();
         this.effectsBus = this.context.createGain();
-        this.musicBus.connect(this.context.destination);
-        this.effectsBus.connect(this.context.destination);
+        const output = this.context.createWaveShaper();
+        const curve = new Float32Array(4096);
+        for (let i = 0; i < curve.length; i++) {
+          const x = i * 2 / (curve.length - 1) - 1, magnitude = Math.abs(x);
+          curve[i] = magnitude <= .65 ? x : Math.sign(x) * (.65 + .25 * (1 - Math.exp(-(magnitude - .65) / .25)));
+        }
+        output.curve = curve;
+        output.oversample = "2x";
+        output.connect(this.context.destination);
+        this.musicBus.connect(output);
+        const limiter = this.context.createDynamicsCompressor();
+        limiter.threshold.value = -10;
+        limiter.knee.value = 10;
+        limiter.ratio.value = 6;
+        limiter.attack.value = .002;
+        limiter.release.value = .14;
+        this.effectsBus.connect(limiter);
+        limiter.connect(output);
       }
       this.musicBus!.gain.value = this.settings.volume * 0.18;
-      this.effectsBus!.gain.value = this.settings.volume * 0.85;
+      this.effectsBus!.gain.value = this.settings.volume * 1.1;
       await this.context.resume();
       if (generation !== this.generation || this.disposed || !this.visible)
         return;
@@ -163,7 +182,48 @@ export class GameAudio {
     oscillator.start(at);
     oscillator.stop(at + duration + 0.03);
   }
-  cue(cue: AudioCue): void {
+  combat(impact: Impact, cast?: AudioCue): void {
+    if (cast) this.cue(cast);
+    for (const [i, beat] of impact.beats.entries()) this.cue(beat.cue, beat.at, Math.min(i, 4));
+    if (impact.cue === "victory") this.cue("victory", (impact.beats.at(-1)?.at ?? 0) + 180);
+    else if (!impact.beats.length && impact.cue) this.cue(impact.cue, 120);
+  }
+  cancelEffects(): void { this.stopNotes(this.effectNotes); }
+  private percussion(at: number, duration: number, volume: number, cutoff: number): void {
+    const context = this.context!;
+    if (!this.noiseBuffer) {
+      this.noiseBuffer = context.createBuffer(1, Math.ceil(context.sampleRate * .6), context.sampleRate);
+      const samples = this.noiseBuffer.getChannelData(0);
+      let seed = 1337;
+      for (let i = 0; i < samples.length; i++) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        samples[i] = seed / 0x80000000 - 1;
+      }
+    }
+    const source = context.createBufferSource();
+    source.buffer = this.noiseBuffer;
+    const filter = context.createBiquadFilter();
+    filter.type = "bandpass"; filter.frequency.value = cutoff; filter.Q.value = .65;
+    const envelope = context.createGain();
+    envelope.gain.setValueAtTime(.0001, at);
+    envelope.gain.exponentialRampToValueAtTime(volume, at + .002);
+    envelope.gain.exponentialRampToValueAtTime(.0001, at + duration);
+    source.connect(filter); filter.connect(envelope); envelope.connect(this.effectsBus!);
+    this.effectNotes.add(source);
+    source.onended = () => { this.effectNotes.delete(source); source.disconnect(); filter.disconnect(); envelope.disconnect(); };
+    source.start(at); source.stop(at + duration + .01);
+  }
+  private duck(at: number): void {
+    if (!this.musicBus || !this.settings.music) return;
+    const gain = this.musicBus.gain, now = this.context!.currentTime;
+    this.duckUntil = Math.max(this.duckUntil, at + .4);
+    gain.cancelScheduledValues(now);
+    gain.setValueAtTime(gain.value, now);
+    gain.linearRampToValueAtTime(this.settings.volume * .045, Math.max(now + .015, at));
+    gain.setValueAtTime(this.settings.volume * .045, this.duckUntil - .16);
+    gain.linearRampToValueAtTime(this.settings.volume * .18, this.duckUntil);
+  }
+  cue(cue: AudioCue, delayMs = 0, pitchStep = 0): void {
     if (
       !this.context ||
       this.context.state !== "running" ||
@@ -173,7 +233,7 @@ export class GameAudio {
     )
       return;
     try {
-      const now = this.context.currentTime;
+      const now = this.context.currentTime + Math.max(0, delayMs) / 1000;
       if (cue === "trial" || cue === "perfect") {
         // Rising arpeggio, bass pulse, then a major chord: an audible reward arc.
         this.note(36, now, .3, "sine", .8, false, 24);
@@ -183,6 +243,7 @@ export class GameAudio {
         return;
       }
       if (cue === "guard" || cue === "debuff") {
+        this.percussion(now, .1, .48, cue === "guard" ? 4800 : 800);
         (cue === "guard" ? [88,95,100] : [61,58,53]).forEach((pitch,i) =>
           this.note(pitch, now + i * .045, .2, cue === "guard" ? "triangle" : "sawtooth", .25, false));
         this.note(cue === "guard" ? 55 : 40, now, .16, "sine", .5, false, 30);
@@ -200,9 +261,11 @@ export class GameAudio {
         ].includes(cue)
       ) {
         const strong = cue !== "impact";
-        this.note(strong ? 53 : 48, now, strong ? .24 : .16, "sine", .85, false, 22);
+        this.duck(now);
+        this.percussion(now, strong ? .22 : .12, strong ? .85 : .6, cue === "hurt" ? 950 : cue === "break" ? 3800 : 2100 + pitchStep * 400);
+        this.note((strong ? 53 : 48) + pitchStep, now, strong ? .28 : .19, "sine", .95, false, 22);
         this.note(
-          cue === "hurt" ? 49 : 88,
+          (cue === "hurt" ? 49 : 88) + pitchStep * 2,
           now,
           0.055,
           "square",
@@ -243,6 +306,7 @@ export class GameAudio {
         reward: [72, 76, 79, 84],
         click: [79],
       };
+      if (cue === "attack") this.percussion(now, .09, .2, 3200);
       pitches[cue]!.forEach((pitch, i) =>
         this.note(
           pitch,
@@ -257,7 +321,7 @@ export class GameAudio {
       /* Optional audio cannot block actions. */
     }
   }
-  private stopNotes(notes: Set<OscillatorNode>): void {
+  private stopNotes<T extends AudioScheduledSourceNode>(notes: Set<T>): void {
     for (const node of notes) {
       try {
         node.stop();

@@ -12,7 +12,7 @@ async page => {
     }
     for(let seed=0;seed<12;seed++){
       const start=e.createRun('scholar',seed), run=e.enterNode(start,e.availableNodes(start)[0].id), first=l.caseForBattle(run);
-      if(first.id==='code-v2-agent-observation')return {cases,screenshot:{run,first,second:l.transferFor(first)}};
+      if(first.id==='beginner-intro-react-error')return {cases,screenshot:{run,first,second:l.transferFor(first)}};
     }
     throw new Error('Screenshot question fixture not found');
   });
@@ -38,14 +38,15 @@ async page => {
   const f=fixtures.screenshot;
   await load(f.run);
   await page.getByRole('button',{name:'提示',exact:true}).click();
-  for(const name of ['decide(messages)','working_dir'])if(!(await page.locator('#lab-hint').innerText()).includes(name))throw new Error('Screenshot lacks targeted code hint');
+  if(!(await page.locator('#lab-hint').innerText()).includes(f.first.hint))throw new Error('Missing current beginner hint');
+  if(await page.locator('.lab-code').count()||!(await page.locator('.learning-intro').innerText()).includes(f.first.intro))throw new Error('Beginner must get a plain-language introduction');
   await page.screenshot({path:'output/engineering-hint-desktop.png',fullPage:true});
   await page.locator('[data-action="lab-choice"]').nth((f.first.correct+1)%3).click();
   if(await page.locator('#lab-hint').isVisible())throw new Error('First hint leaked open into second stage');
   if(!await page.getByRole('status',{name:'上一题解析'}).isVisible())throw new Error('Hint broke first-step feedback');
   const before=await saved();
   await page.getByRole('button',{name:'提示',exact:true}).click();
-  if(!(await page.locator('#lab-hint').innerText()).includes('同事方案'))throw new Error('Missing transfer-specific guidance');
+  if(!(await page.locator('#lab-hint').innerText()).includes(f.second.hint))throw new Error('Missing current follow-up guidance');
   if(before!==await saved())throw new Error('Transfer hint modified saved state');
   await page.reload(); await page.getByRole('button',{name:'继续学习',exact:true}).click();
   if(await page.locator('#lab-hint').isVisible())throw new Error('UI hint should be collapsed after reload');
@@ -63,5 +64,5 @@ async page => {
   if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1))throw new Error('Mobile hint overflows');
   await page.screenshot({path:'output/engineering-hint-mobile.png',fullPage:true});
   if(errors.length)throw new Error(errors.join('\n'));
-  return 'PASS: opt-in hints across ten chapters, screenshot-specific code guidance, two stages, keyboard, collapse, unchanged save/resources, feedback, reload and mobile scroll.';
+  return 'PASS: beginner hints across ten chapters, simple reading guide, two stages, keyboard, collapse, unchanged save/resources, feedback, reload and mobile scroll.';
 }
