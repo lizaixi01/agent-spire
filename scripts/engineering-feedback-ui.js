@@ -1,5 +1,6 @@
 async page => {
   const errors=[]; page.on('pageerror',error=>errors.push(error.message));
+  await page.setViewportSize({width:1440,height:960});
   await page.goto('http://127.0.0.1:5173/');
   const fixtures=await page.evaluate(async()=>{
     const e=await import('/src/engine.ts'), l=await import('/src/learning-cases.ts');
