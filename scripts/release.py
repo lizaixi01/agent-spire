@@ -136,19 +136,16 @@ def assert_main(commit):
 
 
 def release_record(version):
-    # Query this tag directly: a previously cached release listing may omit a new draft.
-    result = subprocess.run([shutil.which('gh') or 'gh', 'api', '-H', 'Cache-Control: no-cache',
-                             f'repos/{REPO}/releases/tags/v{version}'],
-                            cwd=ROOT, capture_output=True, text=True, encoding='utf-8')
-    if result.returncode == 0:
-        return json.loads(result.stdout)
-    try:
-        missing = str(json.loads(result.stdout).get('status')) == '404'
-    except ValueError:
-        missing = False
-    if missing:
+    # REST /releases/tags only returns published releases. GraphQL also resolves drafts.
+    owner, name = REPO.split('/')
+    query = ('query($owner:String!,$name:String!,$tag:String!){'
+             'repository(owner:$owner,name:$name){release(tagName:$tag){databaseId}}}')
+    result = gh_json('api', 'graphql', '-f', f'query={query}', '-f', f'owner={owner}',
+                     '-f', f'name={name}', '-f', f'tag=v{version}')
+    record = result['data']['repository']['release']
+    if record is None:
         return None
-    raise subprocess.CalledProcessError(result.returncode, result.args, output=result.stdout, stderr=result.stderr)
+    return gh_json('api', f'repos/{REPO}/releases/{record["databaseId"]}')
 
 
 def wait_for_ci(state):
@@ -212,15 +209,10 @@ def publish(state, directory):
             '无需 npm 依赖；离线版需 Node.js 22.12+，在线版无需安装。\n\n'
             '全量测试、类型检查、双构建、包体积检查和 Pages 部署通过。'
             '附件直接来自同一提交的 CI player-package。SHA256 见 SHA256SUMS.txt。\n', encoding='utf-8')
-        run('gh', 'release', 'create', tag, '--repo', REPO, '--target', commit, '--verify-tag', '--draft',
-            '--title', f'Agent 尖塔 {tag}', '--notes-file', notes)
-        for attempt in range(6):
-            record = release_record(version)
-            if record is not None:
-                break
-            if attempt < 5:
-                time.sleep(2)
-        require(record is not None, 'Draft is not visible yet. Resume after checking GitHub.')
+        record = gh_json('api', f'repos/{REPO}/releases', '--method', 'POST',
+                         '-f', f'tag_name={tag}', '-f', f'target_commitish={commit}',
+                         '-f', f'name=Agent 尖塔 {tag}', '-F', 'draft=true',
+                         '-f', f'body={notes.read_text(encoding="utf-8")}')
     require(gh_json('api', f'repos/{REPO}/commits/{tag}')['sha'] == commit, 'Release tag differs.')
     for asset in assets:
         existing = next((item for item in record['assets'] if item['name'] == asset.name), None)

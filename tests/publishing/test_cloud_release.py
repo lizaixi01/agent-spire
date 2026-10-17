@@ -120,15 +120,38 @@ class CloudReleaseTests(unittest.TestCase):
 
 
 class ReproduciblePackageTests(unittest.TestCase):
-    def test_draft_lookup_uses_direct_tag_and_only_treats_404_as_missing(self):
-        def result(code, body):
-            return subprocess.CompletedProcess(['gh', 'api'], code, stdout=json.dumps(body), stderr='')
-        with patch.object(cloud.release.subprocess, 'run', return_value=result(0, {'tag_name': 'v0.1.4', 'draft': True})) as runner:
+    def test_first_publication_uses_created_draft_record_without_requery(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            manifest = {'version': '0.1.6', 'commit': 'abc123', 'archive': 'agent-spire-v0.1.6-play.zip', 'bytes': 7}
+            (directory / 'RELEASE-MANIFEST.json').write_text(json.dumps(manifest))
+            (directory / manifest['archive']).write_bytes(b'archive')
+            (directory / 'SHA256SUMS.txt').write_text('checksum')
+
+            def api(*args):
+                if '--method' in args:
+                    return {'id': 42, 'draft': True, 'assets': []}
+                return {'sha': 'abc123'}
+
+            with patch.object(cloud.release, 'verify'), patch.object(cloud.release, 'assert_main'), \
+                    patch.object(cloud.release, 'run', return_value='') as runner, \
+                    patch.object(cloud.release, 'gh_json', side_effect=api) as github, \
+                    patch.object(cloud.release, 'release_record', return_value=None) as lookup:
+                cloud.release.publish({'version': '0.1.6', 'commit': 'abc123'}, directory)
+            self.assertEqual(lookup.call_count, 1)
+            self.assertEqual(sum('--method' in call.args for call in github.call_args_list), 1)
+            self.assertEqual(sum(call.args[:3] == ('gh', 'release', 'upload') for call in runner.call_args_list), 3)
+
+    def test_draft_lookup_resolves_id_with_graphql_and_preserves_api_errors(self):
+        with patch.object(cloud.release, 'gh_json', side_effect=[
+                {'data': {'repository': {'release': {'databaseId': 123}}}},
+                {'tag_name': 'v0.1.4', 'draft': True}]) as runner:
             self.assertTrue(cloud.release.release_record('0.1.4')['draft'])
-            self.assertTrue(runner.call_args.args[0][-1].endswith('/releases/tags/v0.1.4'))
-        with patch.object(cloud.release.subprocess, 'run', return_value=result(1, {'status': '404'})):
+            self.assertEqual(runner.call_args_list[0].args[:2], ('api', 'graphql'))
+            self.assertTrue(runner.call_args_list[1].args[1].endswith('/releases/123'))
+        with patch.object(cloud.release, 'gh_json', return_value={'data': {'repository': {'release': None}}}):
             self.assertIsNone(cloud.release.release_record('0.1.4'))
-        with patch.object(cloud.release.subprocess, 'run', return_value=result(1, {'status': '403'})):
+        with patch.object(cloud.release, 'gh_json', side_effect=subprocess.CalledProcessError(1, ['gh', 'api'])):
             with self.assertRaises(subprocess.CalledProcessError):
                 cloud.release.release_record('0.1.4')
 
