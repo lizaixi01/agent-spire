@@ -1,5 +1,6 @@
 // Isolated test profile. Valid engine fixtures exercise focused render/effect states.
 async function implementationUI(page) {
+  await page.emulateMedia({reducedMotion:'no-preference'});
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
   await page.addInitScript(() => {
@@ -28,17 +29,22 @@ async function implementationUI(page) {
   await page.keyboard.press("1"); await page.keyboard.press("e");
   if (initial !== await page.evaluate(() => localStorage.getItem("agent-spire.run.v1"))) throw new Error("Keyboard bypassed gate");
   await page.screenshot({path:"output/mandatory-gate.png"});
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
+  const exercise=await page.evaluate(async()=>{
+    const {caseForBattle,transferFor}=await import('/src/learning-cases.ts');
+    const c=caseForBattle(JSON.parse(localStorage.getItem('agent-spire.run.v1')));
+    return {first:c.correct,second:transferFor(c).correct};
+  });
+  await page.locator('[data-action="lab-choice"]').nth(exercise.first).click();
   if (await page.locator('.hand .game-card:not(:disabled)').count()) throw new Error("Unlocked after one answer");
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
+  await page.locator('[data-action="lab-choice"]').nth(exercise.second).click();
   if (!(await page.locator('.hand .game-card:not(:disabled)').count())) throw new Error("Cards still locked after both stages");
   await page.locator('[data-action="end-turn"]').click();
   await page.locator(".fx-number.player-warning").waitFor();
   if (!(await page.locator(".fx-number.player-warning").innerText()).includes("3")) throw new Error("Incorrect incoming damage warning");
   if (!(await page.locator(".fx-number.absorb").innerText()).includes("6")) throw new Error("Absorbed block lost");
   if (!(await page.locator(".fx-hurt-vignette").count())) throw new Error("No damage vignette");
-  const duration = await page.locator(".combat-stage").evaluate(e => Math.max(...e.getAnimations().map(a => a.effect.getTiming().duration)));
-  if (duration < 400) throw new Error("Heavy shake too short");
+  await page.waitForFunction(()=>document.querySelector('.battlefield')?.getAnimations().some(a=>a.playState==='running'));
+  if(await page.locator('.end-turn-wrap').evaluate(e=>e.getAnimations().length)) throw new Error('Incoming camera shake moved turn controls');
   await page.screenshot({path:"output/incoming-damage.png"});
   // A fully blocked strike must show actual absorbed damage, not the discarded leftover shield.
   await page.evaluate(async () => {
@@ -54,18 +60,19 @@ async function implementationUI(page) {
   await page.locator('.player-guard').waitFor();
   if (!(await page.locator('.fx-number.absorb').innerText()).includes('9')) throw new Error('Wrong shield absorption');
   await page.screenshot({path:'output/full-guard.png'});
-  // Each implementation topic is readable and all rewards survive reload until claimed.
-  for (const topic of ['checkpoint','memory','compaction']) {
-    await page.evaluate(async topic => {
+  // Beginner chapters remain readable and rewards survive reload until claimed.
+  for (const topic of [2,3,4]) {
+    await page.evaluate(async chapter => {
       const {createRun,availableNodes,enterNode}=await import('/src/engine.ts');
       const {TRIALS}=await import('/src/trials.ts');
       let r=createRun('scholar',42), n=availableNodes(r)[0]; n.kind='quiz'; r=enterNode(r,n.id);
-      const t=TRIALS.find(t=>t.topic===topic);
-      r.quiz={lessonId:t.questions[0].lessonId,selected:null,correct:null,boss:false,trial:{id:t.id,step:0,answers:[],reward:null}};
+      const t=TRIALS.find(t=>t.questions[0].chapter===chapter);
+      r.act=chapter; r.map.forEach(n=>n.lessonId=t.questions[0].lessonId);
+      r.quiz={lessonId:t.questions[0].lessonId,selected:null,correct:null,boss:false,trial:{id:t.id,revision:3,step:0,answers:[],reward:null}};
       r.player.hp=40; localStorage.setItem('agent-spire.run.v1',JSON.stringify(r));
     },topic);
     await page.reload(); await page.getByRole('button',{name:'继续学习',exact:true}).click();
-    if (!(await page.locator('.trial-code').count())) throw new Error('No implementation pseudocode');
+    if (await page.locator('.trial-code').count()||!await page.locator('.learning-intro').count()) throw new Error('Beginner quiz must have a guide without code');
     await page.screenshot({path:`output/trial-${topic}.png`,fullPage:true});
     for (let i=0;i<3;i++) {
       const answer = await page.evaluate(async()=>{
@@ -106,5 +113,5 @@ async function implementationUI(page) {
   if(!(await page.locator('.trial-celebration.reduced').count()))throw new Error('Reduced motion lost reward notice');
   await page.emulateMedia({reducedMotion:'no-preference'});
   if(errors.length)throw new Error(errors.join('\n'));
-  return 'PASS: mandatory gate + keyboard, real incoming damage + shield, stronger shake, 3 implementation topics, perfect reward effects, pending loot reload/claim, mobile + reduced motion.';
+  return 'PASS: mandatory gate + keyboard, real incoming damage + shield, stronger shake, 3 beginner chapters, perfect reward effects, pending loot reload/claim, mobile + reduced motion.';
 }

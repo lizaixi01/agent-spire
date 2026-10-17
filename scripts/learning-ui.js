@@ -1,4 +1,5 @@
 async function learningUI(page) {
+  await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto("http://127.0.0.1:5173/");
   const text = await page.locator("body").innerText();
   for (const fluff of [
@@ -42,8 +43,14 @@ async function learningUI(page) {
     localStorage.setItem('agent-spire.run.v1',JSON.stringify(r));
   });
   await page.reload(); await page.getByRole('button',{name:'继续学习',exact:true}).click();
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
+  for(let step=0;step<2;step++) {
+    const answer=await page.evaluate(async()=>{
+      const {caseForBattle,transferFor}=await import('/src/learning-cases.ts');
+      const r=JSON.parse(localStorage.getItem('agent-spire.run.v1')),c=caseForBattle(r);
+      return r.battle.lab.choice===null?c.correct:transferFor(c).correct;
+    });
+    await page.locator('[data-action="lab-choice"]').nth(answer).click();
+  }
   await page
     .getByRole("button", { name: "环境观测，0能量，抽 1 张牌。", exact: true })
     .click();

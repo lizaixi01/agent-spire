@@ -18,6 +18,10 @@ async function depthUI(page) {
   // Focused visual fixture: expose the combo cards without altering character rules.
   await page.evaluate(() => {
     const r=JSON.parse(localStorage.getItem('agent-spire.run.v1'));
+    if(!r.deck.some(c=>c.defId==='react')) {
+      const card={uid:'depth-react',defId:'react',upgraded:false};
+      r.deck.push(card); r.battle.hand.push({...card});
+    }
     for(const id of ['observe','react','strike','strike']) {
       const index=r.battle.drawPile.findIndex(c=>c.defId===id);
       if(index>=0)r.battle.hand.push(...r.battle.drawPile.splice(index,1));
@@ -26,8 +30,14 @@ async function depthUI(page) {
   });
   await page.reload(); await page.getByRole('button',{name:'继续学习',exact:true}).click();
   await page.locator(".lab-evidence").waitFor();
-  if (!(await page.locator(".lab-evidence").innerText()).includes("不存在"))
-    throw new Error("First battle lacks concrete ReAct evidence");
+  const exercise=await page.evaluate(async()=>{
+    const {caseForBattle,transferFor}=await import('/src/learning-cases.ts');
+    const c=caseForBattle(JSON.parse(localStorage.getItem('agent-spire.run.v1')));
+    return {first:c,second:transferFor(c)};
+  });
+  if (!(await page.locator(".lab-evidence").innerText()).includes(exercise.first.evidence)||
+      !(await page.locator(".learning-intro").innerText()).includes(exercise.first.intro))
+    throw new Error("First battle lacks beginner scene and explanation");
   if (!(await page.locator(".enemy-health").innerText()).includes("/ 40"))
     throw new Error("Combat still has old low HP");
   if (
@@ -42,17 +52,14 @@ async function depthUI(page) {
   if (background !== "none") throw new Error("Busy bitmap card art remains");
   await page.screenshot({ path: "output/depth-decision.png" });
   const energy = Number(await page.locator(".energy-orb b").innerText());
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
+  await page.locator('[data-action="lab-choice"]').nth(exercise.first.correct).click();
   if (Number(await page.locator(".energy-orb b").innerText()) !== energy + 1)
     throw new Error("Correct engineering decision gives no immediate benefit");
   if (await page.locator(".lab-completion").count())
     throw new Error("One click falsely marked concept mastered");
-  await page
-    .getByRole("heading", {
-      name: "换成浏览器任务：点击按钮后页面没有变化，下一步呢？",
-    })
-    .waitFor();
-  await page.locator('[data-action="lab-choice"]').nth(1).click();
+  if(await page.locator('.lab-situation').innerText()!==exercise.second.question)
+    throw new Error('Second stage did not show its own beginner scenario');
+  await page.locator('[data-action="lab-choice"]').nth(exercise.second.correct).click();
   if (
     !(await page.locator(".lab-completion").innerText()).includes("掌握度 +1")
   )
@@ -87,6 +94,7 @@ async function depthUI(page) {
     "combo"
   )
     throw new Error("Combo impact missing");
+  await page.waitForFunction(()=>document.querySelector('.enemy-health')?.textContent?.includes('26 / 40'));
   if (!(await page.locator(".enemy-health").innerText()).includes("26 / 40"))
     throw new Error("ReAct combo has incorrect actual damage");
   await page.screenshot({ path: "output/depth-combo.png" });
@@ -101,6 +109,7 @@ async function depthUI(page) {
     })
     .first()
     .dragTo(page.locator(".enemy-fighter").first());
+  await page.waitForFunction(()=>document.querySelector('.enemy-health')?.textContent?.includes('20 / 40'));
   if (!(await page.locator(".enemy-health").innerText()).includes("20 / 40"))
     throw new Error("Aimed card play failed or played twice");
   await page.reload();
