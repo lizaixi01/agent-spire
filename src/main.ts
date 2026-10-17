@@ -61,6 +61,7 @@ import { installCardDrag } from "./card-input";
 import { MODELS, modelForCharacter, modelSprite, modelLogo } from "./models";
 import { BOSS_RULES, bossStatus } from "./boss-mechanics";
 import { eventView, eventRelicLabel } from "./chapter-events";
+import { caseHint } from "./learning-hints";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const SAVE_KEY = "agent-spire.run.v1";
@@ -127,6 +128,7 @@ let view: "home" | "game" | "codex" = "home";
 let selectedChar: CharacterId = "scholar";
 let activeLessonId: string | null = null;
 let labExpanded = innerWidth >= 1100;
+let labHintVisible = false;
 let presentationTimer: number | undefined;
 let seedDraft = "";
 let modal:
@@ -236,6 +238,9 @@ function remember(): void {
 }
 function update(next: Run, deferRender = 0): void {
   if (next === run) return;
+  if (next.position !== run?.position || next.seed !== run?.seed || next.character !== run?.character ||
+    next.battle?.lab?.caseId !== run?.battle?.lab?.caseId || next.battle?.lab?.choice !== run?.battle?.lab?.choice ||
+    next.battle?.lab?.transfer !== run?.battle?.lab?.transfer) labHintVisible = false;
   run = next;
   remember();
   write(SAVE_KEY, encodeRun(run));
@@ -393,9 +398,11 @@ function learningPanel(): string {
   const prompt = choice === null ? c.situation : second.question;
   const evidence = choice === null ? c.evidence : second.code ?? c.evidence;
   const hasCode = choice === null ? c.codeLanguage : second.codeLanguage ?? c.codeLanguage;
+  const hint = caseHint(c, choice === null ? "action" : "transfer");
   return `<details class="lab-panel ${verified ? "verified" : ""}" ${labExpanded ? "open" : ""}><summary>${icon(verified ? "check" : "code", "", 18)}<b>${verified ? "理解已验证" : complete ? "案例复盘" : "工程决策"}</b><span>${complete ? l.title : choice === null ? "1 / 2 · 选对 +1 能量" : hasCode ? "2 / 2 · 错因辨析" : "2 / 2 · 验证迁移"}</span></summary><div class="lab-body"><div class="lab-source"><b>${l.title}</b>${sourceLabel(c.source ?? l)}</div>
   ${choice !== null ? `<section class="lab-feedback ${choice === c.correct ? "correct" : "incorrect"}" role="status" aria-label="上一题解析"><h3>第 1 步 · ${choice === c.correct ? "判断正确 · 能量 +1 · 抽牌 +1" : "判断有误 · 虚弱 +1"}</h3><p class="feedback-question">${esc(c.situation)}</p><p><b>你的选择：${"ABC"[choice]}</b> ${esc(c.options[choice])}</p><p><b>${choice === c.correct ? "正确原因" : "错在这里"}：</b>${esc(c.consequences[choice])}</p>${choice !== c.correct ? `<p><b>正确选项：${"ABC"[c.correct]}</b> ${esc(c.options[c.correct])}</p><p><b>为什么正确：</b>${esc(c.consequences[c.correct])}</p>` : ""}</section>` : ""}
   <p class="lab-situation">${esc(prompt)}</p>${hasCode ? `<pre class="lab-code"><code>${esc(evidence)}</code></pre><small class="lab-code-label">Python 3 · 工程练习</small>` : `<blockquote class="lab-evidence">${esc(evidence)}</blockquote>`}
+  ${!complete ? `<div class="lab-hint-controls">${btn("lab-hint", labHintVisible ? "收起提示" : "提示", "lab-hint-toggle", `aria-expanded="${labHintVisible}" aria-controls="lab-hint"`)}<small>查看解题方向</small></div><aside id="lab-hint" class="lab-hint" aria-label="解题提示" ${labHintVisible ? "" : "hidden"}><p>${esc(hint.focus)}</p><small>${esc(hint.method)}</small></aside>` : ""}
   ${!complete ? `<div class="lab-options">${options.map((o,i)=>btn("lab-choice",`<span>${"ABC"[i]}</span>${esc(o)}`,"lab-choice",`data-index="${i}"`)).join("")}</div>` : `<p class="lab-result ${transfer === second.correct ? "correct" : "incorrect"}"><b>${transfer === second.correct ? "诊断验证正确" : "诊断验证有误"}</b>${esc(second.explanation)}</p><div class="lab-completion">${verified ? `${icon("seal", "", 24)}<b>掌握度 +1</b><span>格挡 +6 · 金币 +10</span>` : `<b>本次未获得掌握度</b><span>正确做法：${esc(c.options[c.correct])}；${esc(second.options[second.correct])}</span>`}</div>`}
   </div></details>`;
 }
@@ -775,6 +782,18 @@ app.addEventListener("click", (event) => {
     case "focus-lab":
       labExpanded = true; render();
       document.querySelector(".lab-panel")?.scrollIntoView({ block: "center", behavior: "smooth" });
+      break;
+    case "lab-hint":
+      if (run?.screen === "combat" && run.battle && run.battle.lab?.transfer == null) {
+        labHintVisible = !labHintVisible;
+        const hint = document.querySelector<HTMLElement>("#lab-hint");
+        const button = document.querySelector<HTMLButtonElement>('[data-action="lab-hint"]');
+        if (hint && button) {
+          hint.hidden = !labHintVisible;
+          button.setAttribute("aria-expanded", String(labHintVisible));
+          button.textContent = labHintVisible ? "收起提示" : "提示";
+        }
+      }
       break;
     case "lab-choice":
       if (run) {

@@ -2916,6 +2916,13 @@ body:has(.modal-backdrop) .trial-celebration { visibility:hidden; }
 .node-chapter { position:absolute; right:-6px; bottom:-6px; width:18px; height:18px; background:#102131; border:1px solid #8aab9b; color:#dce8c9; font-size:11px; line-height:16px; }
 .lab-code { max-width:100%; margin:12px 0 5px; padding:12px; overflow:auto; max-height:300px; background:#0d1e2c; border-left:2px solid #92bbac; color:#c2dfd6; font:13px/1.65 Consolas,monospace; white-space:pre-wrap; overflow-wrap:anywhere; tab-size:4; }
 .lab-code-label { display:block; color:#859fa0; font-size:11px; margin-bottom:14px; }
+.lab-hint-controls { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0; }
+.lab-hint-toggle { padding:7px 16px; border:1px solid #bfa16a; background:#2a3b42; color:#efd49a; font-size:13px; cursor:pointer; }
+.lab-hint-toggle:hover, .lab-hint-toggle:focus-visible { background:#3a5052; outline:2px solid #d5c48a; outline-offset:2px; }
+.lab-hint-controls > small { color:#9bb4b8; font-size:11px; }
+.lab-hint { margin:0 0 16px; padding:12px; background:#203a3f; border-left:3px solid #9dc8b0; color:#d3e4d8; overflow-wrap:anywhere; }
+.lab-hint p { font-size:13px; line-height:1.85; margin:0 0 8px; }
+.lab-hint small { display:block; font-size:12px; line-height:1.8; color:#b3c9c5; }
 .lab-feedback { padding:14px; border:1px solid #b68b54; border-left:4px solid #dab97e; background:#283a40; margin:12px 0 20px; font-size:12px; color:#d6dfd2; overflow-wrap:anywhere; }
 .lab-feedback.correct { border-color:#83b99a; background:#203b38; }
 .lab-feedback h3 { font-size:13px; line-height:1.7; margin:0 0 8px; color:#f2d292; }
