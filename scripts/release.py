@@ -318,12 +318,4 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        if '--dry-run' in sys.argv:
-            main()
-        else:
-            with release_lock():
-                main()
-    except (RuntimeError, subprocess.CalledProcessError, OSError, ValueError) as error:
-        print(f'Release stopped: {error}\nState: {STATE}\nFix the cause, then: npm run release -- --resume', file=sys.stderr)
-        sys.exit(1)
+    raise SystemExit('Use npm run release to push updates. GitHub Actions owns versioning and publishing; retry failed jobs on GitHub.')

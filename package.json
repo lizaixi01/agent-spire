@@ -14,7 +14,7 @@
     "test:browser": "npx --yes --package @playwright/cli playwright-cli -s=agent-spire run-code --filename scripts/browser-smoke.js",
     "start": "node scripts/serve-game.mjs",
     "release:pack": "npm run build && python scripts/package-release.py && python scripts/smoke-package.py",
-    "release": "python -B scripts/release.py"
+    "release": "python -B scripts/push-release.py"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

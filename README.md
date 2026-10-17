@@ -118,10 +118,12 @@ npm run build         # 生成 dist/
 npm run build:pages   # 生成 GitHub Pages 网页版 dist-pages/
 npm start             # 本地运行构建结果，默认 4173
 npm run release:pack  # 构建、打包并检查 10 MiB 体积上限
-npm run release       # 一键升版、测试、同步源码 / Pages / 下载包（维护者）
+npm run release       # 提交并推送 main，由 GitHub Actions 自动发布；推送后可关终端
 ```
 
-维护者在 `main` 完成本地修改后运行 `npm run release`，Windows 也可双击 `发布更新.cmd`。默认递增补丁版本，并同步 lockfile、界面版本和 README 下载入口。需要已登录且有仓库写权限的 GitHub CLI；首次使用或恢复失败时见 [一键发布说明](docs/RELEASING.md)。
+每次推送到 `main`，GitHub Actions 自动递增补丁版本、同步 lockfile 与 README 下载入口、测试、部署在线版并发布轻量包，完成前核对版本和哈希。整个过程在云端运行，推送成功后可关闭本地终端。PR 和其他分支仅检查，不发布。
+
+维护者也可运行 `npm run release` 或在 Windows 双击 `发布更新.cmd`，自动提交并推送本地修改。机器人会回写版本提交，下次开发前先 `git pull --ff-only`；失败在 Actions 中重试，详见 [云端发布说明](docs/RELEASING.md)。
 
 | 路径 | 用途 |
 | --- | --- |

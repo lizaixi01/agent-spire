@@ -1,6 +1,6 @@
 """Package an already built game with Python's standard library only."""
 from pathlib import Path
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import hashlib
 import json
 
@@ -19,11 +19,19 @@ archive = output / f'{name}-play.zip'
 extra = ['启动游戏.cmd', 'scripts/start-game.ps1', 'scripts/serve-game.mjs',
          'docs/PLAY.md', 'docs/ASSETS.md']
 with ZipFile(archive, 'w', ZIP_DEFLATED, compresslevel=9) as bundle:
+    def add(path, relative):
+        # Stable ZIP metadata lets a rerun resume a partial Release without replacing assets.
+        info = ZipInfo(relative, date_time=(1980, 1, 1, 0, 0, 0))
+        info.compress_type = ZIP_DEFLATED
+        info.create_system = 3
+        info.external_attr = 0o100644 << 16
+        bundle.writestr(info, path.read_bytes(), compresslevel=9)
+
     for path in sorted(dist.rglob('*')):
         if path.is_file():
-            bundle.write(path, f'{name}/{path.relative_to(root).as_posix()}')
+            add(path, f'{name}/{path.relative_to(root).as_posix()}')
     for relative in extra:
-        bundle.write(root / relative, f'{name}/{relative}')
+        add(root / relative, f'{name}/{relative}')
 size = archive.stat().st_size
 if size > 10 * 1024 * 1024:
     archive.unlink()
