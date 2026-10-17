@@ -1,0 +1,27 @@
+{
+  "name": "agent-spire",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "tsc --noEmit",
+    "test:browser": "npx --yes --package @playwright/cli playwright-cli -s=agent-spire run-code --filename scripts/browser-smoke.js",
+    "start": "node scripts/serve-game.mjs",
+    "release:pack": "npm run build && python scripts/package-release.py"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.7",
+    "vitest": "^3.2.4"
+  },
+  "description": "A local-first pixel-art deckbuilding game for learning AI Agent engineering.",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+output/
+reference/
+release/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.playwright-cli/
+*.log
