@@ -3066,4 +3066,153 @@ body:has(.modal-backdrop) .trial-celebration { visibility:hidden; }
 .option-analysis > .is-correct b { color:#b7e6ac; }
 .quiz-page .option-analysis p { margin:5px 0 0; font-size:14px; line-height:1.8; }
 @media(max-width:760px) { .quiz-page .trial-code { font-size:12px; line-height:1.7; } }
+
+:root {
+  --spire-ink: #263845;
+  --spire-deep: #1f303d;
+  --spire-panel: #3a5360;
+  --spire-panel-raised: #486875;
+  --spire-card: #547773;
+  --spire-card-attack: #765255;
+  --spire-card-power: #635681;
+  --spire-paper: #f8eed6;
+  --spire-muted: #d2d9d3;
+  --spire-line: #91aa9f;
+  --gold: #f5c86a;
+  --gold-light: #ffe5a4;
+  --teal: #9fe0bf;
+  --muted: #c9d4d0;
+  --line: #91aa9f;
+  background: var(--spire-ink);
+  color: var(--spire-paper);
+}
+body,
+.app-shell { background: var(--spire-ink); color: var(--spire-paper); }
+.world-background,
+.at-home .world-background,
+.in-battle .world-background {
+  background: linear-gradient(90deg, #233744e8 0%, #304b58b8 48%, #46636b55 100%), linear-gradient(0deg, #233744cc, transparent 58%), url("/pixel/spire.png") center/cover;
+  opacity: .82;
+}
+.at-home .world-background {
+  background: linear-gradient(90deg, #233744d9 0%, #304b5878 47%, #5d777344 100%), linear-gradient(0deg, #233744b8, transparent 58%), url("/pixel/spire.png") center/cover;
+  opacity: .9;
+}
+.rail,
+.topbar { background: #314956ee; border-color: var(--spire-line); }
+.rail-item { color: #c2d0cb; }
+.rail-item.active,
+.rail-item:hover { background: #55776e; color: #fff0bd; }
+.rail-item.active:before { background: var(--gold); }
+.primary-button,
+.secondary-button,
+.end-turn,
+.journal-deck,
+.text-button,
+.lab-hint-toggle {
+  border-color: #e6c77c;
+  background: var(--spire-panel);
+  color: #fff0bd;
+  box-shadow: 3px 3px 0 #182833;
+}
+.primary-button {
+  background: #e2b55d;
+  border-color: #fff0bd;
+  color: #253642;
+  box-shadow: inset -3px -3px 0 #b78243, inset 3px 3px 0 #fff0bd, 4px 4px 0 #182833;
+}
+.primary-button:hover:not(:disabled),
+.secondary-button:hover:not(:disabled),
+.end-turn:hover:not(:disabled),
+.journal-deck:hover:not(:disabled),
+.lab-hint-toggle:hover,
+.lab-hint-toggle:focus-visible { background: #65877d; color: #fff7d8; border-color: #fff0bd; }
+.home-chapter,
+.journey-panel,
+.quiz-sheet,
+.choice-card,
+.shop-extra,
+.event-choice,
+.lesson-card,
+.modal,
+.source-box,
+.lab-panel,
+.boss-mechanic,
+.event-contract {
+  background: var(--spire-panel);
+  border-color: var(--spire-line);
+  color: var(--spire-paper);
+}
+.home-chapter:hover,
+.choice-card:hover:not(:disabled),
+.shop-extra:hover:not(:disabled),
+.event-choice:hover:not(:disabled),
+.lesson-card:hover { background: var(--spire-panel-raised); border-color: var(--gold-light); }
+.map-node,
+.quiz-option,
+.lab-choice,
+.search-field,
+.chapter-filter > button,
+.seed-input input { background: var(--spire-deep); border-color: var(--spire-line); color: var(--spire-paper); }
+.map-node.available,
+.chapter-filter > button.selected { background: #796642; border-color: var(--gold-light); color: #fff0bd; }
+.map-node.visited { background: #47705f; border-color: #a9dec1; color: #e0f6da; }
+.map-node.boss-node { background: #774d4e; border-color: #efad91; }
+.map-lines path { stroke: #b7c9c1aa; }
+.map-lines path.reachable { stroke: #ffe19a; }
+.map-lines path.traversed { stroke: #a9dfbd; }
+.game-card,
+.game-card.attack,
+.game-card.power {
+  background: var(--spire-card);
+  border-color: #afd1bb;
+  color: #fff5de;
+  box-shadow: 3px 4px 0 #1b2c37;
+}
+.game-card.attack { background: var(--spire-card-attack); border-color: #f0b18d; }
+.game-card.power { background: var(--spire-card-power); border-color: #d2b8f0; }
+.game-card:hover:not(:disabled) { border-color: #fff0bd; box-shadow: 3px 4px 0 #1b2c37; }
+.card-art,
+.concept-art.minimal { background: #698b82; border-color: #a8c8b5; color: #fff1bd; }
+.attack .concept-art.minimal { background: #895e60; color: #ffe0bd; }
+.power .concept-art.minimal { background: #756793; color: #ebd8ff; }
+.card-description,
+.card-source,
+.card-type,
+.page-heading p,
+.muted,
+.small,
+.lesson-card p,
+.event-story,
+.battle-footer,
+.battle-footer .text-button { color: var(--spire-muted); }
+.health-bar { background: #304a4c; border-color: #a8d0b2; }
+.health-bar > i { background: #83c58e; }
+.enemy-health { background: #5b3e4a; border-color: #ed9b8d; }
+.enemy-health > i { background: #db7975; }
+.arena-floor {
+  background: repeating-linear-gradient(90deg, #57747b55 0 50px, #7f989855 50px 52px), repeating-linear-gradient(0deg, #3b596733 0 24px, #a9b9b344 24px 26px);
+  border-color: #9fb9ac;
+}
+.energy-orb { background: #477c6a; border-color: #b9e4b4; box-shadow: 3px 3px 0 #1b2c37; }
+.pile-card { background: #4d6973; border-color: #b5c9bc; box-shadow: -3px 3px 0 #20343f, -5px 5px 0 #7f9a99; }
+.lab-evidence,
+.trial-code,
+.lab-code,
+.option-analysis > div { background: #2b4652; border-color: #a5d0be; color: #e6f0e7; }
+.quiz-option:hover:not(:disabled),
+.lab-choice:hover,
+.lab-choice:focus-visible { background: #52756e; border-color: #ffe5a4; }
+.quiz-option.correct,
+.lab-completion,
+.trial-loot { background: #477760; border-color: #b9e5af; }
+.quiz-option.incorrect { background: #754d4d; border-color: #f0a895; }
+.modal-backdrop { background: #152735cc; }
+.character-option { background: #466773; border-color: #9cbdb3; }
+.character-option.selected { background: #5b806e; border-color: #ffe4a0; }
+.toast,
+.learning-intro,
+.lab-hint,
+.lab-feedback,
+.encounter-preparation { background: #42665f; border-color: #acd6bd; color: #eff5df; }
 @media(min-width:1100px) { .battle-page[data-locked="true"] .combat-layout { grid-template-columns:minmax(0,1fr) minmax(400px,470px); } }
