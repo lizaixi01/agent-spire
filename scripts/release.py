@@ -136,9 +136,19 @@ def assert_main(commit):
 
 
 def release_record(version):
-    # Unlike /releases/latest, authenticated listing includes our recoverable drafts.
-    releases = gh_json('api', '--paginate', '--slurp', f'repos/{REPO}/releases?per_page=100')
-    return next((item for page in releases for item in page if item['tag_name'] == f'v{version}'), None)
+    # Query this tag directly: a previously cached release listing may omit a new draft.
+    result = subprocess.run([shutil.which('gh') or 'gh', 'api', '-H', 'Cache-Control: no-cache',
+                             f'repos/{REPO}/releases/tags/v{version}'],
+                            cwd=ROOT, capture_output=True, text=True, encoding='utf-8')
+    if result.returncode == 0:
+        return json.loads(result.stdout)
+    try:
+        missing = str(json.loads(result.stdout).get('status')) == '404'
+    except ValueError:
+        missing = False
+    if missing:
+        return None
+    raise subprocess.CalledProcessError(result.returncode, result.args, output=result.stdout, stderr=result.stderr)
 
 
 def wait_for_ci(state):
@@ -204,7 +214,12 @@ def publish(state, directory):
             '附件直接来自同一提交的 CI player-package。SHA256 见 SHA256SUMS.txt。\n', encoding='utf-8')
         run('gh', 'release', 'create', tag, '--repo', REPO, '--target', commit, '--verify-tag', '--draft',
             '--title', f'Agent 尖塔 {tag}', '--notes-file', notes)
-        record = release_record(version)
+        for attempt in range(6):
+            record = release_record(version)
+            if record is not None:
+                break
+            if attempt < 5:
+                time.sleep(2)
         require(record is not None, 'Draft is not visible yet. Resume after checking GitHub.')
     require(gh_json('api', f'repos/{REPO}/commits/{tag}')['sha'] == commit, 'Release tag differs.')
     for asset in assets:

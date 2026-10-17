@@ -120,6 +120,18 @@ class CloudReleaseTests(unittest.TestCase):
 
 
 class ReproduciblePackageTests(unittest.TestCase):
+    def test_draft_lookup_uses_direct_tag_and_only_treats_404_as_missing(self):
+        def result(code, body):
+            return subprocess.CompletedProcess(['gh', 'api'], code, stdout=json.dumps(body), stderr='')
+        with patch.object(cloud.release.subprocess, 'run', return_value=result(0, {'tag_name': 'v0.1.4', 'draft': True})) as runner:
+            self.assertTrue(cloud.release.release_record('0.1.4')['draft'])
+            self.assertTrue(runner.call_args.args[0][-1].endswith('/releases/tags/v0.1.4'))
+        with patch.object(cloud.release.subprocess, 'run', return_value=result(1, {'status': '404'})):
+            self.assertIsNone(cloud.release.release_record('0.1.4'))
+        with patch.object(cloud.release.subprocess, 'run', return_value=result(1, {'status': '403'})):
+            with self.assertRaises(subprocess.CalledProcessError):
+                cloud.release.release_record('0.1.4')
+
     def test_package_hash_is_independent_of_file_timestamps(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
