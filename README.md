@@ -39,7 +39,7 @@
 ### 下载离线游玩
 
 <!-- release-version:start -->
-当前版本 **v0.1.4** · 游玩包 **`agent-spire-v0.1.4-play.zip`** · [在线体验](https://lizaixi01.github.io/agent-spire/) · [下载与精确体积](https://github.com/lizaixi01/agent-spire/releases/latest)
+当前版本 **v0.1.5** · 游玩包 **`agent-spire-v0.1.5-play.zip`** · [在线体验](https://lizaixi01.github.io/agent-spire/) · [下载与精确体积](https://github.com/lizaixi01/agent-spire/releases/latest)
 <!-- release-version:end -->
 
 1. 从 [Releases](https://github.com/lizaixi01/agent-spire/releases/latest) 下载上述 **`-play.zip`**，解压整个文件夹。GitHub 自动生成的 Source code 是开发源码。
