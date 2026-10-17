@@ -22,3 +22,15 @@ Python 3 标准库打包 dist/、Windows 启动器、Node 静态服务器与游�
 CI 在每次推送及 PR 执行测试、类型检查、构建与体积检查，失败时查看 Actions 日志；修复后重新推送。Release 附件由维护者在验证完成后上传。
 
 历史素材留在本机 reference/unpublished-assets/，不会随源码下载。src/style.css 的历史背景引用统一指向仍在使用的 pixel/spire.png，避免构建重新收录旧背景。
+
+## GitHub Pages 在线体验
+
+访问 https://lizaixi01.github.io/agent-spire/ 即可在浏览器游玩，无需安装 Node.js。在线版需要网络加载资源；下载包继续用于本地离线游玩。
+
+`npm run build:pages` 单独生成 dist-pages/，Vite 将脚本、CSS、图片、字体及图标的路径统一加上 /agent-spire/ 前缀。该目录被 Git 忽略，不影响下载包的 dist/ 与根路径。
+
+仓库 Pages 来源设置为 GitHub Actions。Checks 工作流在测试、类型检查、下载体积检查和网页构建通过后上传 Pages 产物；只有 main 的非 PR 运行可部署到 github-pages 环境。失败时查看 Actions 日志，修复后重新推送或手动运行工作流；需要回退时恢复已验证提交再部署。现有站点在新部署失败时继续提供上一版本。
+
+在线版和本地版属于不同站点，存档各自保存在当前浏览器，不会自动同步。GitHub Pages 上同一域名的其他项目共享浏览器 origin，后续项目应避免复用本游戏的存档键。
+
+部署后检查首页、全部静态资源及字体无 404，实际走通选角、进入战斗、作答、出牌、刷新恢复，并检查手机布局。自动构建成功不等于在线验收完成。

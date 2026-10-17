@@ -11,7 +11,7 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178c6)
 ![Offline](https://img.shields.io/badge/游玩-无需模型_API-86cda9)
 
-[**下载游玩包**](https://github.com/lizaixi01/agent-spire/releases/latest) · [快速开始](#快速开始) · [玩法](#怎么玩) · [开发](#参与开发)
+[**在线体验 · 打开即玩**](https://lizaixi01.github.io/agent-spire/) · [**下载游玩包**](https://github.com/lizaixi01/agent-spire/releases/latest) · [快速开始](#快速开始) · [玩法](#怎么玩) · [开发](#参与开发)
 
 ![Agent 尖塔主界面：三位角色与章节练习](docs/images/home.png)
 
@@ -29,7 +29,13 @@
 
 ## 快速开始
 
-### 只想游玩
+### 在线体验（推荐）
+
+打开 [Agent 尖塔在线版](https://lizaixi01.github.io/agent-spire/) 即可游玩，无需安装 Node.js、下载游戏或配置 API 密钥。推荐使用桌面浏览器；手机也可访问。
+
+进度保存在当前浏览器，在线版与本地下载版的存档分别保存，不会自动同步。
+
+### 下载离线游玩
 
 1. 从 [Releases](https://github.com/lizaixi01/agent-spire/releases/latest) 下载 **`agent-spire-v0.1.1-play.zip`**，解压整个文件夹。请选择 `-play.zip`；GitHub 自动生成的 Source code 是开发源码。
 2. 安装 [Node.js](https://nodejs.org/) 22.12+，也兼容 20.19+。
@@ -102,6 +108,7 @@ npm run dev
 npm test              # 包含实际执行 Python 代码样例的验证
 npm run check         # TypeScript 类型检查
 npm run build         # 生成 dist/
+npm run build:pages   # 生成 GitHub Pages 网页版 dist-pages/
 npm start             # 本地运行构建结果，默认 4173
 npm run release:pack  # 构建、打包并检查 10 MiB 体积上限
 ```
