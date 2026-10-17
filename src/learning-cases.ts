@@ -1,6 +1,6 @@
 import type { Run } from "./engine";
 import { LESSON_BY_ID } from "./content";
-import { ENGINEERING_TRIALS } from "./trial-bank";
+import { HELL_QUESTIONS } from "./hell-content";
 import { BEGINNER_FOLLOW_UPS, BEGINNER_QUESTIONS, practiceQuestion, type BeginnerQuestion } from "./beginner-content";
 
 export interface LearningCase {
@@ -279,12 +279,13 @@ export const CASES: LearningCase[] = [
   ),
 ];
 // Keep old IDs and answer indices intact for already-answered saved battles.
-for (const trial of ENGINEERING_TRIALS) for (const q of trial.questions) {
+for (const q of HELL_QUESTIONS) {
   const proposal = (q.correct + 1) % 3;
   CASES.push({
     id:`code-v2-${q.id}`,lesson:q.lessonId,situation:q.question,evidence:q.code,
     options:q.options as LearningCase["options"],correct:q.correct,
     consequences:q.optionReasons as LearningCase["consequences"],codeLanguage:"python",
+    hint:q.hint,
     source:{chapter:q.chapter,section:q.section,page:q.page},
     transfer:{
       question:`同事建议「${q.options[proposal]}」。依据题设，哪项判断准确解释了这个方案？`,
@@ -504,7 +505,8 @@ export function caseForBattle(run: Run): LearningCase {
   if (saved && Object.hasOwn(CASE_BY_ID, saved)) return orderedCase(CASE_BY_ID[saved],run.battle?.lab);
   const node = run.map.find((n) => n.id === run.position);
   const chapter = node ? LESSON_BY_ID[node.lessonId].chapter : run.act;
-  const matching = CASES.filter(c => c.level === "beginner" && LESSON_BY_ID[c.lesson].chapter === chapter);
+  const matching = CASES.filter(c => (run.learningMode === "hell" ? c.id.startsWith("code-v2-") : c.level === "beginner") &&
+    LESSON_BY_ID[c.lesson].chapter === chapter);
   const unseen = matching.filter(c => !run.encounteredCases?.includes(c.id));
   const pool = unseen.length ? unseen : matching.filter(c=>c.id!==run.encounteredCases?.at(-1));
   return pool[

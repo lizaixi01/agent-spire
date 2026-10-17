@@ -6,6 +6,9 @@ import { trialQuestionAt } from "./trials";
 // Called only on a newly parsed and validated run. Keep completed answers under
 // their original question definitions; replace only work that is still pending.
 export function restoreBeginnerLearning(run: Run): void {
+  // An explicit hard-mode choice must survive reload; only legacy/default runs
+  // receive the beginner-content migration.
+  if (run.learningMode === "hell") return;
   const lab = run.battle?.lab;
   if (lab && lab.transfer === null && CASE_BY_ID[lab.caseId].level !== "beginner") {
     if (lab.choice === null) {

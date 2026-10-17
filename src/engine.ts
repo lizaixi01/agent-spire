@@ -15,7 +15,7 @@ import {
 import { actLessons, chapterForRow, LESSON_BY_ID, CHAPTER_COUNT, CHAPTER_BOSSES } from "./content";
 import { caseForBattle, transferFor } from "./learning-cases";
 import { synergyFor } from "./synergy";
-import { TRIALS, trialQuestion, trialReward, type TrialReward } from "./trials";
+import { trialsForMode, trialQuestion, trialReward, type TrialReward } from "./trials";
 import { createBossState, beforeBossCard, afterBossCard, bossCardDamage, bossHpFloor, bossIntent, bossTurnEnd, type BossState } from "./boss-mechanics";
 import { eventView } from "./chapter-events";
 
@@ -106,9 +106,11 @@ export interface Player {
   relics: RelicId[];
   resetCharges?: number;
 }
+export type LearningMode = "beginner" | "hell";
 export interface Run {
   version: 1;
   curriculumVersion?: 2;
+  learningMode?: LearningMode;
   seed: number;
   rng: number;
   character: CharacterId;
@@ -206,11 +208,13 @@ function makeMap(act: number, rng: { rng: number }): MapNode[] {
 export function createRun(
   character: CharacterId = "scholar",
   seed = Date.now(),
+  learningMode: LearningMode = "beginner",
 ): Run {
   const hero = CHARACTERS.find((c) => c.id === character) ?? CHARACTERS[0];
   const run: Run = {
     version: 1,
     curriculumVersion: 2,
+    learningMode,
     seed: seed >>> 0,
     rng: seed >>> 0,
     character: hero.id,
@@ -765,7 +769,7 @@ function toMap(run: Run): Run {
 function startQuiz(run: Run, boss: boolean): void {
   const node = run.map.find(n => n.id === run.position);
   const chapter = node ? LESSON_BY_ID[node.lessonId].chapter : chapterForRow(run.act, 0);
-  const matching = TRIALS.filter(t => t.questions.every(q => q.chapter === chapter));
+  const matching = trialsForMode(run.learningMode).filter(t => t.questions.every(q => q.chapter === chapter));
   const remaining = matching.filter(t => !run.completedTrials?.includes(t.id));
   const pool = remaining.length ? remaining : matching;
   const trial = pool[Math.floor(random(run) * pool.length)];
@@ -773,7 +777,7 @@ function startQuiz(run: Run, boss: boolean): void {
   const optionOrders = order.map(() => shuffle(run, [0,1,2]));
   run.screen = "quiz";
   run.quiz = { lessonId: trial.questions[order[0]].lessonId, selected: null, correct: null, boss,
-    trial: { id: trial.id, step: 0, answers: [], reward: null, order, optionOrders, revision: 3 } };
+    trial: { id: trial.id, step: 0, answers: [], reward: null, order, optionOrders, revision: run.learningMode === "hell" ? 4 : 3 } };
 }
 export function chooseReward(input: Run, uid: string | null): Run {
   if (input.screen !== "reward" || !input.reward) return input;

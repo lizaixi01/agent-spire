@@ -173,7 +173,7 @@ export function caseHint(c: LearningCase, phase: "action" | "transfer"): Learnin
     return {focus:phase === "transfer" ? c.transfer?.hint ?? c.hint! : c.hint!,
       method:"先读上方小知识，再想一想哪一步能帮助完成眼前的任务。"};
   const id = c.id.replace(/^code-v2-/, "");
-  const focus = EXERCISE_HINTS[id] ?? `围绕「${LESSON_BY_ID[c.lesson].title}」，先列出题设证据和当前动作真正读取的信息，再与任务的限制逐项核对。`;
+  const focus = c.hint ?? EXERCISE_HINTS[id] ?? `围绕「${LESSON_BY_ID[c.lesson].title}」，先列出题设证据和当前动作真正读取的信息，再与任务的限制逐项核对。`;
   return {
     focus,
     method: phase === "action"

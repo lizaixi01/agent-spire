@@ -47,6 +47,7 @@ import {
   resolveEvent,
   type Run,
   type RoomKind,
+  type LearningMode,
 } from "./engine";
 import { decodeRun, encodeRun } from "./save";
 import { icon } from "./icons";
@@ -55,7 +56,7 @@ import { cardIllustration } from "./card-art";
 import { GameAudio, audioSettings } from "./audio";
 import { combatFeedback } from "./combat-feedback";
 import { capturePositions, showCombatEffects, clearCombatEffects, showTrialCelebration } from "./visual-effects";
-import { TRIAL_BY_ID, trialQuestion, trialQuestionAt, trialScore } from "./trials";
+import { TRIAL_BY_ID, trialQuestion, trialQuestionAt, trialScore, practiceForMode } from "./trials";
 import { caseForBattle, transferFor } from "./learning-cases";
 import { synergyFor } from "./synergy";
 import { impactFor } from "./impact";
@@ -64,7 +65,7 @@ import { MODELS, modelForCharacter, modelSprite, modelLogo } from "./models";
 import { BOSS_RULES, bossStatus } from "./boss-mechanics";
 import { eventView, eventRelicLabel } from "./chapter-events";
 import { caseHint, trialHint, practiceHint, type LearningHint } from "./learning-hints";
-import { practiceQuestion, FOUNDATIONS } from "./beginner-content";
+import { FOUNDATIONS } from "./beginner-content";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const SAVE_KEY = "agent-spire.run.v1";
@@ -129,6 +130,7 @@ let run: Run | null = saved ? decodeRun(saved) : null;
 let profile = loadProfile();
 let view: "home" | "game" | "codex" = "home";
 let selectedChar: CharacterId = "scholar";
+let selectedLearningMode: LearningMode = run?.learningMode ?? "beginner";
 let activeLessonId: string | null = null;
 let labExpanded = innerWidth >= 1100;
 type HintScope = "lab" | "quiz" | "practice";
@@ -287,6 +289,13 @@ function flash(message: string): void {
 function heading(_eyebrow: string, title: string, subtitle = ""): string {
   return `<div class="page-heading"><h1>${title}</h1>${subtitle ? `<p>${subtitle}</p>` : ""}</div>`;
 }
+function modeSelector(): string {
+  return `<fieldset class="learning-mode"><legend>题目难度</legend><div>${(["beginner", "hell"] as const).map(mode =>
+    btn("select-learning-mode", mode === "hell" ? "地狱模式" : "入门模式", `secondary-button ${selectedLearningMode === mode ? "selected" : ""}`,
+      `data-id="${mode}" aria-pressed="${selectedLearningMode === mode}"`)).join("")}</div><p>${selectedLearningMode === "hell"
+    ? "90 道 Python 工程题：追踪代码、排错、辨析取舍。答错沿用入门模式的惩罚与奖励规则，可继续远征；图鉴可自由练习。"
+    : "先读小知识，再判断生活化情境；适合初次接触 Agent。"}</p></fieldset>`;
+}
 function nav(): string {
   return `<aside class="rail"><button class="rail-mark" data-action="home" aria-label="返回首页">${icon("tower", "", 31)}</button><div class="rail-line"></div>
     ${btn("expedition", icon("compass") + "<span>远征</span>", `rail-item ${view !== "codex" ? "active" : ""}`, 'title="远征地图"')}
@@ -301,7 +310,7 @@ function topbar(): string {
     ${
       active
         ? `<div class="run-stats"><span class="hp-stat">${icon("heart", "", 17)} <b>${run!.player.hp}</b><small>/ ${run!.player.maxHp}</small></span><span class="gold-stat">${icon("coin", "", 18)} <b>${run!.player.gold}</b></span>
-      <button class="top-deck" data-action="deck">${icon("layers", "", 18)} ${run!.deck.length}</button><span class="stat-sep"></span><span class="floor-stat">第 ${run!.act} 幕 <i>·</i> ${run!.floors} 层</span></div>`
+      <button class="top-deck" data-action="deck">${icon("layers", "", 18)} ${run!.deck.length}</button><span class="stat-sep"></span><span class="floor-stat">${run!.learningMode === "hell" ? "<b class=hell-badge>地狱模式</b> · " : ""}第 ${run!.act} 幕 <i>·</i> ${run!.floors} 层</span></div>`
         : ""
     }
     <div class="top-actions">${active ? `<span class="save-indicator"><i></i>${storageAvailable ? (savedAt ? "已自动保存" : "自动存档") : "本次进度未保存"}</span>` : ""}${btn("settings", icon("settings", "", 19), "icon-button", 'aria-label="设置与来源" title="设置与来源"')}</div></header>`;
@@ -449,7 +458,7 @@ function quizPage(): string {
   const final = !!t && t.step === 2 && answered;
   const reward = t?.reward;
   const rewardText = reward ? [reward.gold ? `${reward.gold} 金币` : "", reward.heal ? `回复 ${reward.heal} 生命` : "", reward.relic ? RELICS[reward.relic].name : "", reward.potion ? "能量药水" : ""].filter(Boolean).join(" · ") : "";
-  const title = l.level === "beginner" ? `第 ${l.chapter} 章 · 入门小测` : t ? TRIAL_BY_ID[t.id].title : "知识试炼";
+  const title = run!.learningMode === "hell" ? `地狱模式 · 第 ${l.chapter} 章 · 工程试炼` : l.level === "beginner" ? `第 ${l.chapter} 章 · 入门小测` : t ? TRIAL_BY_ID[t.id].title : "知识试炼";
   const progress = t ? `<div class="trial-progress" aria-label="试炼进度">${[0,1,2].map(i => `<span class="${i < t.answers.length ? t.answers[i] === trialQuestionAt(q,i).correct ? "passed" : "missed" : i === t.step ? "active" : ""}">${i+1}</span>`).join("")}<b>${score} / 3 正确</b></div>` : "";
   const options = l.options.map((option,i) => btn("answer",`<span class="option-letter">${"ABC"[i]}</span><span>${esc(option)}</span>${answered && i === l.correct ? icon("check","",19) : ""}`,
     `quiz-option ${answered && i === l.correct ? "correct" : ""} ${answered && i === q.selected && !q.correct ? "incorrect" : ""}`,`data-index="${i}" ${answered ? "disabled" : ""}`)).join("");
@@ -530,14 +539,14 @@ function codexPage(): string {
           .toLowerCase()
           .includes(search.toLowerCase())),
   );
-  return `<main class="codex-page">${heading("", "知识图鉴")}<div class="codex-summary"><span>${icon("spark", "", 19)} 已探索 <b>${profile.learned.length}</b> / ${LESSONS.length}</span><span>${icon("seal", "", 19)} 已验证理解 <b>${Object.values(profile.mastery).filter((n) => n > 0).length}</b></span><span>${icon("book", "", 19)} ${SOURCE.author} · ${SOURCE.version}</span></div>
+  return `<main class="codex-page">${heading("", "知识图鉴")}${modeSelector()}<div class="codex-summary"><span>${icon("spark", "", 19)} 已探索 <b>${profile.learned.length}</b> / ${LESSONS.length}</span><span>${icon("seal", "", 19)} 已验证理解 <b>${Object.values(profile.mastery).filter((n) => n > 0).length}</b></span><span>${icon("book", "", 19)} ${SOURCE.author} · ${SOURCE.version}</span></div>
     <div class="codex-controls"><div class="chapter-filter">${btn("chapter", "全部章节", chapterFilter === 0 ? "selected" : "", 'data-index="0"')}${CHAPTERS.map((name, i) => btn("chapter", `${String(i + 1).padStart(2, "0")} ${name}`, chapterFilter === i + 1 ? "selected" : "", `data-index="${i + 1}"`)).join("")}</div><label class="search-field">${icon("search", "", 19)}<input id="knowledge-search" type="search" placeholder="搜索知识与概念…" value="${esc(search)}" aria-label="搜索知识与概念"></label></div>
     <div class="lesson-grid">${lessons.map((l) => `<button class="lesson-card ${profile.learned.includes(l.id) ? "discovered" : ""}" data-action="lesson" data-id="${l.id}"><span class="lesson-chapter">第 ${l.chapter} 章<i>${profile.learned.includes(l.id) ? "已探索" : "可研读"}</i></span><h3>${l.title}${icon("arrow", "", 17)}</h3><p>${l.concept}</p><div class="lesson-card-footer"><small>§${l.section} · 书内 p.${l.page}</small><span class="mastery-dots">${[1, 2, 3].map((n) => `<i class="${(profile.mastery[l.id] ?? 0) >= n ? "filled" : ""}"></i>`).join("")}</span></div></button>`).join("")}${lessons.length ? "" : '<p class="empty-results">没有找到匹配的知识点，请换个关键词。</p>'}</div><p class="source-note">知识解释与试题为基于原书的转述；卡牌效果、人物、关卡与数值为原创游戏设计。图鉴覆盖十章核心概念，不替代全书阅读。</p></main>`;
 }
 function modalContent(): string {
   if (modal === "characters") {
     const selected = CHARACTERS.find((c) => c.id === selectedChar)!;
-    return `<h2>选择角色</h2><div class="character-grid">${CHARACTERS.map((c) => `<button class="character-option ${selectedChar === c.id ? "selected" : ""}" data-action="select-character" data-id="${c.id}"><div>${heroArt(c.color, modelForCharacter(c.id))}</div><h3>${c.name}</h3><small>${c.hp} 生命</small><small>${c.energy} 能量 · 每回合抽 ${c.draw} 张</small></button>`).join("")}</div><div class="character-detail"><p>${selected.description}</p><p>专属起始牌：${[...new Set(selected.starterDeck.filter(id => CARD_BY_ID[id].character === selected.id))].map(id => CARD_BY_ID[id].name).join("、")}</p><small>${RELICS[selected.relic as keyof typeof RELICS].name}：${RELICS[selected.relic as keyof typeof RELICS].description}</small></div><div class="begin-row"><label class="seed-input">远征种子（可选）<input id="seed" placeholder="留空则随机" value="${esc(seedDraft)}" maxlength="30" autocomplete="off"></label>${btn("begin", "踏入尖塔", "primary-button")}</div>${run && !["victory", "defeat"].includes(run.screen) ? '<p class="small muted">新开一局会替换当前远征，已学知识保留。</p>' : ""}`;
+    return `<h2>选择角色</h2>${modeSelector()}<div class="character-grid">${CHARACTERS.map((c) => `<button class="character-option ${selectedChar === c.id ? "selected" : ""}" data-action="select-character" data-id="${c.id}"><div>${heroArt(c.color, modelForCharacter(c.id))}</div><h3>${c.name}</h3><small>${c.hp} 生命</small><small>${c.energy} 能量 · 每回合抽 ${c.draw} 张</small></button>`).join("")}</div><div class="character-detail"><p>${selected.description}</p><p>专属起始牌：${[...new Set(selected.starterDeck.filter(id => CARD_BY_ID[id].character === selected.id))].map(id => CARD_BY_ID[id].name).join("、")}</p><small>${RELICS[selected.relic as keyof typeof RELICS].name}：${RELICS[selected.relic as keyof typeof RELICS].description}</small></div><div class="begin-row"><label class="seed-input">远征种子（可选）<input id="seed" placeholder="留空则随机" value="${esc(seedDraft)}" maxlength="30" autocomplete="off"></label>${btn("begin", "踏入尖塔", "primary-button")}</div>${run && !["victory", "defeat"].includes(run.screen) ? '<p class="small muted">新开一局会替换当前远征，已学知识保留。</p>' : ""}`;
   }
   if (modal === "help")
     return `<h2>你的第一场远征</h2><div class="help-grid"><article><b>01</b><h3>沿路线向上</h3><p>选择闪光的相邻节点。战斗、试炼、事件、商店与休憩各有收获。每幕第九层是首领，共十章十幕。</p></article><article><b>02</b><h3>观察，然后行动</h3><p>敌人头顶显示下一回合意图。点击卡牌消耗能量，点击敌人切换目标。攻击造成伤害，格挡抵御攻击。</p></article><article><b>03</b><h3>构筑你的能力</h3><p>胜利后三选一获得新牌。篝火可以回复生命或升级卡牌。遗物持续生效；药水在战斗中使用。</p></article><article><b>04</b><h3>让理解留下来</h3><p>卡牌对应原书知识点。试炼作答后提供解释与来源。答对获得 25 金币和 5 生命；首领试炼答完即可前进。</p></article></div><div class="help-status"><p><b>状态说明</b>　力量：增加每次攻击牌伤害；虚弱：攻击伤害降低 25%；易伤：受到攻击伤害增加 50%；侵蚀：敌人行动前扣除生命，随后减少 1 层。</p><p><b>牌堆规则</b>　每回合抽 5 张、恢复基础能量。结束回合弃掉手牌；抽牌堆空后洗入弃牌。能力牌与消耗牌本场不再抽到，下一战恢复。</p><p><b>快捷键</b>　1—9 出牌 · E 结束回合 · Esc 关闭面板。进度在每次行动后保存到本机浏览器。</p></div>${btn("close", "关闭" + icon("arrow", "", 18), "primary-button")}`;
@@ -553,8 +562,8 @@ function modalContent(): string {
         .join(
           "",
         )}</div><p class="small muted">卡牌效果为学习隐喻，数值不代表实际 Agent 性能。</p>${btn("practice", "检验我的理解" + icon("arrow", "", 18), "primary-button")}`;
-    const p = practiceQuestion(l.id);
-    return `<span class="eyebrow">入门练习</span><h2>${l.title}</h2>${learningIntro(p.intro)}<blockquote class="lab-evidence">${esc(p.scene)}</blockquote><h3 class="practice-question">${esc(p.question)}</h3>${practiceAnswer === null ? hintControl("practice",practiceHint(l.id)) : ""}<div class="quiz-options">${p.options.map((o,i) => btn("practice-answer",`<span class="option-letter">${"ABC"[i]}</span><span>${esc(o)}</span>`, `quiz-option ${practiceAnswer !== null && i === p.correct ? "correct" : ""} ${practiceAnswer === i && i !== p.correct ? "incorrect" : ""}`,`data-index="${i}" ${practiceAnswer !== null ? "disabled" : ""}`)).join("")}</div>${practiceAnswer !== null ? `<div class="quiz-explanation"><h3>${practiceAnswer === p.correct ? "理解正确" : "一起看看为什么"}</h3><p>${esc(p.explanation)}</p><div class="option-analysis">${p.optionReasons.map((reason,i) => `<div class="${i === p.correct ? "is-correct" : ""}"><b>${"ABC"[i]}${i === p.correct ? " · 正确" : ""}${i === practiceAnswer ? " · 你的选择" : ""}</b><p>${esc(reason)}</p></div>`).join("")}</div><small>${sourceLabel(p)}</small></div>${btn("next-practice","下一个知识点"+icon("arrow","",17),"secondary-button")}` : '<p class="small muted">自由练习记录掌握度，不影响远征资源。</p>'}`;
+    const p = practiceForMode(l.id, selectedLearningMode);
+    return `<span class="eyebrow">${selectedLearningMode === "hell" ? "地狱练习" : "入门练习"}</span><h2>${l.title}</h2>${learningIntro(p.intro)}${p.scene ? `<blockquote class="lab-evidence">${esc(p.scene)}</blockquote>` : ""}<h3 class="practice-question">${esc(p.question)}</h3>${p.code ? `<pre class="trial-code"><code>${esc(p.code)}</code></pre><small class="trial-code-label">Python 3 · 工程练习</small>` : ""}${practiceAnswer === null ? hintControl("practice",selectedLearningMode === "hell" ? trialHint(p) : practiceHint(l.id)) : ""}<div class="quiz-options">${p.options.map((o,i) => btn("practice-answer",`<span class="option-letter">${"ABC"[i]}</span><span>${esc(o)}</span>`, `quiz-option ${practiceAnswer !== null && i === p.correct ? "correct" : ""} ${practiceAnswer === i && i !== p.correct ? "incorrect" : ""}`,`data-index="${i}" ${practiceAnswer !== null ? "disabled" : ""}`)).join("")}</div>${practiceAnswer !== null ? `<div class="quiz-explanation"><h3>${practiceAnswer === p.correct ? "理解正确" : "一起看看为什么"}</h3><p>${esc(p.explanation)}</p><div class="option-analysis">${(p.optionReasons ?? []).map((reason,i) => `<div class="${i === p.correct ? "is-correct" : ""}"><b>${"ABC"[i]}${i === p.correct ? " · 正确" : ""}${i === practiceAnswer ? " · 你的选择" : ""}</b><p>${esc(reason)}</p></div>`).join("")}</div><small>${sourceLabel(p)}</small></div>${btn("next-practice","下一个知识点"+icon("arrow","",17),"secondary-button")}` : '<p class="small muted">自由练习记录掌握度，不影响远征资源。</p>'}`;
   }
   const type = modal;
   const titles: Record<string, string> = {
@@ -678,7 +687,7 @@ function begin(): void {
   targetId = "";
   run = null;
   activeLessonId = null;
-  update(createRun(selectedChar, seed));
+  update(createRun(selectedChar, seed, selectedLearningMode));
   audio.cue("click");
 }
 const cardDrag = installCardDrag(
@@ -722,6 +731,7 @@ app.addEventListener("click", (event) => {
       render();
       break;
     case "continue":
+      selectedLearningMode = run?.learningMode ?? "beginner";
       view = "game";
       render();
       break;
@@ -731,6 +741,13 @@ app.addEventListener("click", (event) => {
       break;
     case "select-character":
       selectedChar = id as CharacterId;
+      render();
+      break;
+    case "select-learning-mode":
+      if (id !== "beginner" && id !== "hell") break;
+      selectedLearningMode = id;
+      practiceAnswer = null;
+      hintVisible.practice = false;
       render();
       break;
     case "study-chapter":
@@ -995,14 +1012,14 @@ app.addEventListener("click", (event) => {
       if (practiceAnswer !== null) break;
       hintVisible.practice = false;
       practiceAnswer = index;
-      if (index === practiceQuestion(selectedLesson).correct)
+      if (index === practiceForMode(selectedLesson, selectedLearningMode).correct)
         profile.mastery[selectedLesson] = Math.min(
           3,
           (profile.mastery[selectedLesson] ?? 0) + 1,
         );
       write(PROFILE_KEY, JSON.stringify(profile));
       audio.cue(
-        index === practiceQuestion(selectedLesson).correct ? "reward" : "turn",
+        index === practiceForMode(selectedLesson, selectedLearningMode).correct ? "reward" : "turn",
       );
       render();
       break;

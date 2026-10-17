@@ -1,9 +1,10 @@
 import { ENGINEERING_TRIALS } from "./trial-bank";
 import { LEGACY_TRIALS } from "./trial-bank-v1";
 import { LESSON_BY_ID } from "./content";
-import type { Run } from "./engine";
+import type { Run, LearningMode } from "./engine";
 import { rewardRelics, type RelicId } from "./cards";
-import { BEGINNER_TRIALS, BEGINNER_BY_ID } from "./beginner-content";
+import { BEGINNER_TRIALS, BEGINNER_BY_ID, practiceQuestion } from "./beginner-content";
+import { HELL_QUESTIONS, HELL_TRIALS } from "./hell-content";
 
 export interface TrialQuestion {
   id?: string;
@@ -44,13 +45,25 @@ export interface Trial {
   questions: TrialQuestion[];
 }
 export const TRIALS: Trial[] = BEGINNER_TRIALS;
-export const TRIAL_BY_ID = Object.fromEntries([...ENGINEERING_TRIALS,...BEGINNER_TRIALS].map(t => [t.id, t])) as Record<string, Trial>;
+export function trialsForMode(mode: LearningMode = "beginner"): Trial[] {
+  return mode === "hell" ? HELL_TRIALS : BEGINNER_TRIALS;
+}
+export function practiceForMode(lessonId: string, mode: LearningMode = "beginner"): TrialQuestion {
+  if (mode === "hell") {
+    const question = HELL_QUESTIONS.find(q => q.lessonId === lessonId);
+    if (!question) throw new Error(`Missing hell practice: ${lessonId}`);
+    return question;
+  }
+  return practiceQuestion(lessonId);
+}
+export const TRIAL_BY_ID = Object.fromEntries([...ENGINEERING_TRIALS,...BEGINNER_TRIALS,...HELL_TRIALS].map(t => [t.id, t])) as Record<string, Trial>;
+const HELL_BY_ID = Object.fromEntries(HELL_TRIALS.map(t => [t.id,t])) as Record<string,Trial>;
 const ENGINEERING_BY_ID = Object.fromEntries(ENGINEERING_TRIALS.map(t => [t.id,t])) as Record<string,Trial>;
 const BEGINNER_TRIAL_BY_ID = Object.fromEntries(BEGINNER_TRIALS.map(t => [t.id,t])) as Record<string,Trial>;
 const LEGACY_BY_ID = Object.fromEntries(LEGACY_TRIALS.map(t => [t.id,t])) as Record<string,Trial>;
 export function trialDefinition(quiz: NonNullable<Run["quiz"]>): Trial {
   const t=quiz.trial!;
-  return (t.revision === 3 ? BEGINNER_TRIAL_BY_ID : t.revision === 2 ? ENGINEERING_BY_ID : LEGACY_BY_ID)[t.id];
+  return (t.revision === 4 ? HELL_BY_ID : t.revision === 3 ? BEGINNER_TRIAL_BY_ID : t.revision === 2 ? ENGINEERING_BY_ID : LEGACY_BY_ID)[t.id];
 }
 export function trialQuestionAt(quiz: NonNullable<Run["quiz"]>, step: number): TrialQuestion {
   const t = quiz.trial!;

@@ -3216,3 +3216,10 @@ body,
 .lab-feedback,
 .encounter-preparation { background: #42665f; border-color: #acd6bd; color: #eff5df; }
 @media(min-width:1100px) { .battle-page[data-locked="true"] .combat-layout { grid-template-columns:minmax(0,1fr) minmax(400px,470px); } }
+.learning-mode { margin:16px 0; padding:12px 14px; border:1px solid var(--spire-line); min-width:0; }
+.learning-mode legend { padding:0 6px; font-size:14px; color:var(--spire-paper); }
+.learning-mode > div { display:flex; flex-wrap:wrap; gap:10px; }
+.learning-mode button { min-height:44px; padding:9px 16px; }
+.learning-mode button.selected { background:#76534b; border-color:var(--gold-light); color:var(--gold-light); }
+.learning-mode p { margin:10px 0 0; color:var(--spire-muted); font-size:13px; line-height:1.8; overflow-wrap:anywhere; }
+.hell-badge { color:#ffc09a; font-weight:400; }

@@ -81,6 +81,7 @@ function valid(value: unknown): value is Run {
   )
     return false;
   if (value.curriculumVersion !== undefined && value.curriculumVersion !== 2) return false;
+  if (value.learningMode !== undefined && value.learningMode !== "beginner" && value.learningMode !== "hell") return false;
   if (value.preparation !== undefined && (!object(value.preparation) ||
     Object.keys(value.preparation).some(k => !["ward", "review"].includes(k)) ||
     [value.preparation.ward, value.preparation.review].some(v => v !== undefined && typeof v !== "boolean"))) return false;
@@ -244,13 +245,13 @@ function valid(value: unknown): value is Run {
   if (object(value.quiz) && value.quiz.trial !== undefined) {
     const q = value.quiz, t = q.trial;
     if (!object(t) || !str(t.id) || !Object.hasOwn(TRIAL_BY_ID, t.id) || !num(t.step, 2) ||
-      !(t.revision === undefined || t.revision === 1 || t.revision === 2 || t.revision === 3) ||
+      !(t.revision === undefined || t.revision === 1 || t.revision === 2 || t.revision === 3 || (t.revision === 4 && value.learningMode === "hell")) ||
       !array(t.answers, a => num(a, 2)) || !Array.isArray(t.answers) ||
       t.answers.length !== t.step + (q.selected === null ? 0 : 1) ||
       (q.selected === null ? q.correct !== null : t.answers.at(-1) !== q.selected)) return false;
     const definition = trialDefinition(q as unknown as NonNullable<Run["quiz"]>);
     if (!definition) return false;
-    if (t.introOverrides !== undefined && (t.revision === 3 || !Array.isArray(t.introOverrides) || t.introOverrides.length !== 3 ||
+    if (t.introOverrides !== undefined && (t.revision === 3 || t.revision === 4 || !Array.isArray(t.introOverrides) || t.introOverrides.length !== 3 ||
       !t.introOverrides.every(id => id === null || (str(id) && Object.hasOwn(BEGINNER_BY_ID,id) && BEGINNER_BY_ID[id].chapter === value.act)))) return false;
     if (t.order !== undefined && (!array(t.order, i => num(i,definition.questions.length-1)) || !Array.isArray(t.order) || t.order.length !== 3 || new Set(t.order).size !== 3)) return false;
     if (t.optionOrders !== undefined && (!Array.isArray(t.optionOrders) || t.optionOrders.length !== 3 || !t.optionOrders.every(order => Array.isArray(order) && order.length === 3 && order.every(i => num(i,2)) && new Set(order).size === 3))) return false;
@@ -269,6 +270,12 @@ function valid(value: unknown): value is Run {
         (["gold", "heal", "relic", "potion"] as const).every(k => reward[k] === candidate[k]);
       if (!matches(expected) && !matches(legacy)) return false;
     }
+  }
+  if (value.learningMode === "hell") {
+    const typed = value as unknown as Run;
+    const lab = typed.battle?.lab;
+    if (lab && (!lab.caseId.startsWith("code-v2-") || lab.beginnerTransfer)) return false;
+    if (typed.quiz && (!typed.quiz.trial || typed.quiz.trial.revision !== 4 || typed.quiz.trial.introOverrides || typed.quiz.beginnerQuestion)) return false;
   }
   if (
     value.reward !== null &&
@@ -314,6 +321,13 @@ export function decodeRun(raw: string): Run | null {
     restoreCurriculum(value);
     restoreBeginnerLearning(value);
     restoreCharacterOwnership(value);
+    // The unpublished one-mistake prototype could end a healthy hell run.
+    // Resume only that answer-related state; HP-based defeats stay final.
+    if (value.learningMode === "hell" && value.screen === "defeat" && value.player.hp > 0) {
+      if (value.quiz?.correct === false) value.screen = "quiz";
+      else if (value.battle?.log.includes("地狱挑战结束：工程决策答错。可查看本题解析后重新挑战。"))
+        value.screen = "combat";
+    }
     return value;
   } catch {
     return null;

@@ -5,6 +5,7 @@ import { decodeRun, encodeRun } from "../src/save";
 import { TRIALS, trialQuestion, trialQuestionAt } from "../src/trials";
 import { chapterRun } from "./fixtures";
 import { ENGINEERING_TRIALS } from "../src/trial-bank";
+import { HELL_QUESTIONS } from "../src/hell-content";
 
 const topics = new Set(["checkpoint", "memory", "compaction"]);
 
@@ -33,7 +34,7 @@ describe("有工程区分度的实现试炼", () => {
       " with contextlib.redirect_stdout(out): exec(compile(item['code'],item['id'],'exec'),{})",
       " result[item['id']]=out.getvalue().strip()",
       "print(json.dumps(result,ensure_ascii=False))",
-    ].join("\n")], { input: JSON.stringify(ENGINEERING_TRIALS.flatMap(t=>t.questions)), encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" }, timeout: 10000 }));
+    ].join("\n")], { input: JSON.stringify(HELL_QUESTIONS), encoding: "utf8", env: { ...process.env, PYTHONIOENCODING: "utf-8" }, timeout: 10000 }));
     expect(outputs["checkpoint-boundary"]).toBe("4");
     expect(outputs["checkpoint-alias"]).toBe("2 2");
     expect(outputs["memory-late-arrival"]).toBe("Beijing");
@@ -44,6 +45,12 @@ describe("有工程区分度的实现试炼", () => {
     expect(outputs["checkpoint-determinism"]).toBe("20 24");
     expect(outputs["memory-filter-topk"]).toBe("0 no memory");
     expect(outputs["compaction-prefix"]).toBe("2");
+    expect(outputs["hell-context-window"]).toBe("['rule', 'request'] 1");
+    expect(outputs["hell-cache-prefix"]).toBe("{'A': 0, 'B': 3, 'C': 1}");
+    expect(outputs["hell-injection-grant"]).toBe("True");
+    expect(outputs["hell-skills-contract"]).toBe("True False");
+    expect(outputs["hell-rag-citation"]).toBe("200 False");
+    expect(outputs["hell-hybrid-ranking"]).toBe("['guide', 'faq']");
   });
 
   it("新试炼抽入门题；选项重排时理由跟随选项，作答前不改变掌握度", () => {

@@ -17,7 +17,7 @@ const problem = (
 
 // Runnable, self-contained exercises. Cursor, publication and deduplication
 // contracts are specified by the exercises, not claimed to be APIs in the PDF.
-export const ENGINEERING_TRIALS: Trial[] = [
+export const ENGINEERING_TRIALS: (Trial & { questions: EngineeringQuestion[] })[] = [
   {id:"checkpoint-write",topic:"checkpoint",title:"Checkpoint · 日志与恢复",questions:[
     problem("checkpoint-boundary",checkpoint,"debug","恢复边界",
       "快照已包含 seq≤2。恢复接口会重发边界记录，且只提供下面两条日志。既保留快照又避免重复累计，应该改哪一行？",`
