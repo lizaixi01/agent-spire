@@ -483,6 +483,13 @@ const transfers: Record<string, Transfer> = {
 export const transferFor = (c: LearningCase): Transfer =>
   c.transfer ?? transfers[c.id] ?? LESSON_BY_ID[c.lesson];
 function orderedCase(c: LearningCase, lab: NonNullable<Run["battle"]>["lab"]): LearningCase {
+  // A completed pre-PR answer refers to the former sibling question and option
+  // order. Only unanswered consolidation may switch to the new follow-up.
+  if (c.level === "beginner" && lab?.transfer !== null && lab?.transfer !== undefined && lab.followUpVersion !== 1) {
+    const parent = BEGINNER_QUESTIONS.find(q => `beginner-${q.id}` === c.id)!;
+    const sibling = BEGINNER_QUESTIONS.find(q => q.lessonId === parent.lessonId && q.id !== parent.id);
+    if (sibling) c = { ...c, transfer: beginnerTransfer(sibling) };
+  }
   if (lab?.beginnerTransfer) c = {...c,transfer:beginnerTransfer(practiceQuestion(c.lesson))};
   if (!lab?.order) return c;
   const order = lab.order;

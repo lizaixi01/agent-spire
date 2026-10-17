@@ -53,8 +53,8 @@ describe("命中节奏与结算一致", () => {
     run.player.hp = 50; run.battle!.enemies[0].boss = { kind: "recovery", lastCard: "banked-reset" };
     run.battle!.hand = [{ uid: "heal", defId: "banked-reset", upgraded: false }];
     const card = run.battle!.hand[0], next = playCard(run, card.uid, run.battle!.enemies[0].id);
-    expect(next.player.hp).toBe(196);
-    expect(combatFeedback(run, next, card)).toContainEqual({ target: "player", kind: "heal", text: "+150 生命" });
+    expect(next.player.hp).toBe(76);
+    expect(combatFeedback(run, next, card)).toContainEqual({ target: "player", kind: "heal", text: "+30 生命" });
     expect(impactFor(run, next, card).beats[0].damage).toBe(4);
   });
 });

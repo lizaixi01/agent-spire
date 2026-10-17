@@ -10,6 +10,7 @@ from zipfile import ZipFile
 root = Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--directory', type=Path, default=root / 'release')
+parser.add_argument('--before-publish', action='store_true', help='Verify CI package, main and Pages before creating a Release')
 args = parser.parse_args()
 repo = 'lizaixi01/agent-spire'
 
@@ -36,13 +37,18 @@ with ZipFile(archive) as bundle:
     require(not any('/node_modules/' in name or '/reference/' in name for name in bundle.namelist()), 'ZIP includes development material.')
 
 require(github(f'repos/{repo}/commits/main')['sha'] == commit, 'GitHub main differs from Release.')
-require(github(f'repos/{repo}/commits/v{version}')['sha'] == commit, 'Release tag differs from build.')
-latest = github(f'repos/{repo}/releases/latest')
-require(latest['tag_name'] == f'v{version}', 'Latest Release version differs.')
-asset = next((item for item in latest['assets'] if item['name'] == archive.name), None)
-require(asset and asset['state'] == 'uploaded' and asset['size'] == manifest['bytes'] and asset['digest'] == f'sha256:{digest}', 'Uploaded asset differs from verified ZIP.')
+if not args.before_publish:
+    require(github(f'repos/{repo}/commits/v{version}')['sha'] == commit, 'Release tag differs from build.')
+    latest = github(f'repos/{repo}/releases/latest')
+    require(latest['tag_name'] == f'v{version}', 'Latest Release version differs.')
+    for path in (archive, args.directory / 'SHA256SUMS.txt', args.directory / 'RELEASE-MANIFEST.json'):
+        asset = next((item for item in latest['assets'] if item['name'] == path.name), None)
+        expected_digest = 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+        require(asset and asset['state'] == 'uploaded' and asset['size'] == path.stat().st_size and
+                asset['digest'] == expected_digest, f'Uploaded asset differs: {path.name}')
 request = Request(f'https://lizaixi01.github.io/agent-spire/build-info.json?commit={commit}', headers={'Cache-Control': 'no-cache'})
 with urlopen(request, timeout=60) as response:
     online = json.load(response)
 require(online == info, 'Live Pages build differs from Release.')
-print(f'PASS: v{version}, {commit}; main, tag, Pages and ZIP match; {manifest["bytes"]:,} bytes; SHA256 verified.')
+scope = 'main, Pages and CI ZIP' if args.before_publish else 'main, tag, Pages and Release assets'
+print(f'PASS: v{version}, {commit}; {scope} match; {manifest["bytes"]:,} bytes; SHA256 verified.')

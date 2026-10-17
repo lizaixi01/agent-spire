@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as engine from "../src/engine";
-import { CARD_BY_ID, CHARACTERS, type CharacterId } from "../src/cards";
+import { CARD_BY_ID, CHARACTERS, cardText, type CharacterId } from "../src/cards";
 import { decodeRun, encodeRun } from "../src/save";
 import { readyForCards } from "./fixtures";
 
@@ -81,19 +81,36 @@ describe("专属牌组与遗物", () => {
     expect(run.battle!.enemies[0].hp).toBe(888);
   });
 
+  it("丝线在第三张牌触发一次，第六张不再抽牌，下回合重新可用", () => {
+    let run = fight("weaver", Array(6).fill("strike"));
+    run.player.energy = 10;
+    run.battle!.drawPile = [
+      { uid: "thread-first", defId: "defend", upgraded: false },
+      { uid: "thread-second", defId: "defend", upgraded: false },
+    ];
+    for (let i = 0; i < 6; i++) run = play(run);
+    expect(run.battle!.hand).toHaveLength(1);
+    expect(run.battle!.drawPile).toHaveLength(1);
+    run = engine.endTurn(run);
+    run.battle!.hand = Array.from({ length: 3 }, (_, i) => ({ uid: `next-${i}`, defId: "strike", upgraded: false }));
+    run.battle!.drawPile = [{ uid: "thread-next-turn", defId: "defend", upgraded: false }];
+    for (let i = 0; i < 3; i++) run = play(run);
+    expect(run.battle!.hand.some(c => c.uid === "thread-next-turn")).toBe(true);
+  });
+
   it("绿色治疗兼顾格挡，重置必须完成工程决策且每幕只能使用一次", () => {
     let run = fight("scholar", ["mend"]);
     run.player.hp = 50;
     run = play(run);
-    expect(run.player.hp).toBe(58);
-    expect(run.player.block).toBe(8);
+    expect(run.player.hp).toBe(54);
+    expect(run.player.block).toBe(5);
     run.battle!.lab!.transfer = null;
     expect(engine.useReset(run)).toBe(run);
     run = readyForCards(run);
     const healed = engine.useReset(run);
-    expect(healed.player.hp).toBe(200);
+    expect(healed.player.hp).toBe(84);
     expect(healed.player.resetCharges).toBe(0);
-    expect(run.player.hp).toBe(58);
+    expect(run.player.hp).toBe(54);
     healed.player.hp = 30;
     expect(engine.useReset(healed)).toBe(healed);
     expect(decodeRun(encodeRun(healed))).toEqual(healed);
@@ -121,7 +138,7 @@ describe("专属牌组与遗物", () => {
     expect(run.battle!.hand.some(c => c.uid === banked.uid)).toBe(true);
     run.player.hp = 10;
     run = engine.playCard(run, banked.uid);
-    expect(run.player.hp).toBe(200);
+    expect(run.player.hp).toBe(40);
     expect(run.deck.some(c => c.uid === banked.uid)).toBe(false);
     expect(run.battle!.exhaust.some(c => c.uid === banked.uid)).toBe(true);
     expect(engine.playCard(run, banked.uid)).toBe(run);
@@ -151,5 +168,18 @@ describe("专属牌组与遗物", () => {
     run.player.resetCharges = 1;
     run.battle!.cardsPlayed = -1;
     expect(decodeRun(encodeRun(run))).toBeNull();
+  });
+
+  it("两种重置都只回复三十生命，旧高生命存档不会放大治疗；临近上限时只补缺口", () => {
+    const base = fight("scholar", ["banked-reset"]);
+    base.player.hp = 20;
+    base.player.maxHp = 212;
+    const legacy = decodeRun(encodeRun(base))!;
+    expect(engine.useReset(legacy).player.hp).toBe(50);
+    expect(play(legacy).player.hp).toBe(50);
+    legacy.player.hp = 207;
+    expect(engine.useReset(legacy).player.hp).toBe(212);
+    expect(play(legacy).player.hp).toBe(212);
+    expect(cardText(legacy.battle!.hand[0])).toContain("回复 30 点生命");
   });
 });

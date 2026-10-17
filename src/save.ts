@@ -218,6 +218,7 @@ function valid(value: unknown): value is Run {
     if (object(b.lab) && b.lab.beginnerTransfer !== undefined &&
       (typeof b.lab.beginnerTransfer !== "boolean" || (b.lab.beginnerTransfer &&
         (b.lab.choice === null || CASE_BY_ID[String(b.lab.caseId)].level === "beginner")))) return false;
+    if (object(b.lab) && b.lab.followUpVersion !== undefined && b.lab.followUpVersion !== 1) return false;
     if (
       !(b.enemies as Obj[]).every(
         (e) =>

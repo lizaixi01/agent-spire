@@ -28,7 +28,7 @@ describe("开始一场远征", () => {
   it("从地图开始，携带完整的初始牌组与资源", () => {
     const run = createRun("scholar", 42);
     expect(run.screen).toBe("map");
-    expect(run.player.hp).toBe(200);
+    expect(run.player.hp).toBe(100);
     expect(run.deck).toHaveLength(10);
     expect(run.player.gold).toBe(99);
     expect(run.act).toBe(1);
@@ -54,10 +54,10 @@ describe("开始一场远征", () => {
 });
 
 describe("卡牌与战斗回合", () => {
-  it("绿色战斗开始时抽三张牌，敌人公开下回合意图", () => {
+  it("绿色战斗开始时抽五张牌，敌人公开下回合意图", () => {
     const base = createRun("scholar", 42);
     const run = enterNode(base, availableNodes(base)[0].id);
-    expect(run.battle?.hand).toHaveLength(3);
+    expect(run.battle?.hand).toHaveLength(5);
     expect(run.player.energy).toBe(2);
     expect(enemyIntent(run.battle!.enemies[0], 1).value).toBeGreaterThan(0);
   });
@@ -91,11 +91,11 @@ describe("卡牌与战斗回合", () => {
     const card = run.battle!.hand.find((c) => c.defId === "defend")!;
     const defended = playCard(run, card.uid);
     const result = endTurn(defended);
-    expect(result.player.hp).toBe(197);
+    expect(result.player.hp).toBe(97);
     expect(result.player.block).toBe(0);
     expect(result.player.energy).toBe(2);
     expect(result.battle!.turn).toBe(2);
-    expect(result.battle!.hand).toHaveLength(3);
+    expect(result.battle!.hand).toHaveLength(5);
   });
 
   it("先观测后打出 ReAct 可获得连携伤害", () => {
@@ -141,9 +141,9 @@ describe("卡牌与战斗回合", () => {
 
   it("药水会消耗，治疗不超过最大生命，不能重复使用同一份药水", () => {
     const run = fight();
-    run.player.hp = 195;
+    run.player.hp = 95;
     const healed = usePotion(run, 0);
-    expect(healed.player.hp).toBe(200);
+    expect(healed.player.hp).toBe(100);
     expect(healed.player.potions).toEqual(["energy"]);
     expect(usePotion(healed, 8)).toEqual(healed);
   });

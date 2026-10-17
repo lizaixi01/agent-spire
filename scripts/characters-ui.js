@@ -2,9 +2,9 @@ async (page) => {
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
   const expected = {
-    scholar: { hp: 200, energy: 2, hand: 3 },
+    scholar: { hp: 100, energy: 2, hand: 5 },
     engineer: { hp: 72, energy: 3, hand: 5 },
-    weaver: { hp: 68, energy: 6, hand: 9 },
+    weaver: { hp: 68, energy: 5, hand: 9 },
   };
   for (const [id, stats] of Object.entries(expected)) {
     await page.goto('http://127.0.0.1:5173/');

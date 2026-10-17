@@ -5,6 +5,7 @@ import {
   CARDS,
   CARD_BY_ID,
   CHARACTERS,
+  RESET_HEAL,
   RELICS,
   cardText,
   statsFor,
@@ -388,7 +389,7 @@ function battlePage(): string {
     b.enemies.find((e) => e.hp > 0)!;
   targetId = currentTarget.id;
   return `<main class="battle-page" data-locked="${!unlocked}"><div class="combat-layout"><section class="combat-stage"><div class="battle-top"><div><h2>第 ${LESSON_BY_ID[r.map.find(n => n.id === r.position)!.lessonId].chapter} 章 · ${b.room === "boss" ? "守关之战" : b.room === "elite" ? "精英挑战" : "普通战斗"}</h2></div><div class="turn-badge"><span>你的回合</span><b>${String(b.turn).padStart(2, "0")}</b></div><div class="potion-bar">${r.player.potions.map((p, i) => btn("potion", icon("flask", p, 24), `potion ${p}`, `data-index="${i}" ${unlocked ? "" : "disabled"} title="${{ heal: "治疗药水：回复 20 生命", energy: "能量药水：获得 2 能量", fire: "烈焰药水：对选定敌人造成 20 伤害" }[p]}" aria-label="${{ heal: "使用治疗药水", energy: "使用能量药水", fire: "使用烈焰药水" }[p]}"`)).join("")}<small>药水</small></div></div>
-    <div class="battlefield"><div class="arena-arch"></div><div class="arena-floor"></div><div class="fighter player-fighter"><div class="fighter-label" title="${hero.description}"><b>${hero.name}</b><small>${hero.energy} 能量 · 抽 ${hero.draw} 张${hero.strength ? ` · 力量 +${hero.strength}` : ""}</small></div>${heroArt(hero.color, modelForCharacter(run!.character))}<div class="health-bar"><i style="width:${(r.player.hp / r.player.maxHp) * 100}%"></i><span>${icon("heart", "", 12)} ${r.player.hp} / ${r.player.maxHp}</span></div><div class="status-row">${r.player.relics.includes("reset") && isRelicForCharacter("reset", r.character) ? btn("reset", `重置 ${r.player.resetCharges ?? 0}/1`, "text-button reset-relic", `${!unlocked || r.player.resetCharges !== 1 || r.player.hp >= r.player.maxHp ? "disabled" : ""} title="${RELICS.reset.description}" aria-label="使用重置：回复全部生命"`) : ""}${r.player.block ? `<span title="格挡抵御伤害，下回合开始时清空（保留效果除外）">${icon("shield", "", 15)} ${r.player.block}</span>` : ""}${r.player.strength ? `<span title="力量：增加攻击牌伤害">${icon("sword", "", 15)} ${r.player.strength}</span>` : ""}${r.player.weak ? `<span class="debuff" title="虚弱：攻击伤害降低 25%">虚弱 ${r.player.weak}</span>` : ""}${r.player.vulnerable ? `<span class="debuff" title="易伤：受到的攻击伤害增加 50%">易伤 ${r.player.vulnerable}</span>` : ""}${b.cache ? `<span title="缓存：每回合额外能量">缓存 ${b.cache}</span>` : ""}${b.retention ? "<span>保留 8</span>" : ""}</div></div>
+    <div class="battlefield"><div class="arena-arch"></div><div class="arena-floor"></div><div class="fighter player-fighter"><div class="fighter-label" title="${hero.description}"><b>${hero.name}</b><small>${hero.energy} 能量 · 抽 ${hero.draw} 张${hero.strength ? ` · 力量 +${hero.strength}` : ""}</small></div>${heroArt(hero.color, modelForCharacter(run!.character))}<div class="health-bar"><i style="width:${(r.player.hp / r.player.maxHp) * 100}%"></i><span>${icon("heart", "", 12)} ${r.player.hp} / ${r.player.maxHp}</span></div><div class="status-row">${r.player.relics.includes("reset") && isRelicForCharacter("reset", r.character) ? btn("reset", `重置 ${r.player.resetCharges ?? 0}/1`, "text-button reset-relic", `${!unlocked || r.player.resetCharges !== 1 || r.player.hp >= r.player.maxHp ? "disabled" : ""} title="${RELICS.reset.description}" aria-label="使用重置：回复 ${RESET_HEAL} 点生命"`) : ""}${r.player.block ? `<span title="格挡抵御伤害，下回合开始时清空（保留效果除外）">${icon("shield", "", 15)} ${r.player.block}</span>` : ""}${r.player.strength ? `<span title="力量：增加攻击牌伤害">${icon("sword", "", 15)} ${r.player.strength}</span>` : ""}${r.player.weak ? `<span class="debuff" title="虚弱：攻击伤害降低 25%">虚弱 ${r.player.weak}</span>` : ""}${r.player.vulnerable ? `<span class="debuff" title="易伤：受到的攻击伤害增加 50%">易伤 ${r.player.vulnerable}</span>` : ""}${b.cache ? `<span title="缓存：每回合额外能量">缓存 ${b.cache}</span>` : ""}${b.retention ? "<span>保留 8</span>" : ""}</div></div>
     <div class="versus-sigil">✦</div><div class="enemies">${b.enemies
       .map((e) => {
         const intent = enemyIntent(e, b.turn);
@@ -815,7 +816,7 @@ app.addEventListener("click", (event) => {
         audio.cue("power");
         update(next);
         showCombatEffects(combatFeedback(before, next), positions);
-        flash("重置完成 · 生命已回满 · 本幕额度已用完");
+        flash(`重置完成 · 回复至多 ${RESET_HEAL} 生命 · 本幕额度已用完`);
       }
       break;
     case "focus-lab":

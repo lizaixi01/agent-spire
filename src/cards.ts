@@ -1,5 +1,6 @@
 import { CHAPTERS, LESSONS, LESSON_BY_ID } from "./content";
 export type CharacterId = "scholar" | "engineer" | "weaver";
+export const RESET_HEAL = 30;
 export type CardType = "attack" | "skill" | "power";
 export interface CardDef {
   id: string;
@@ -52,15 +53,15 @@ export const CHARACTERS: Character[] = [
     id: "scholar",
     name: "观测者",
     english: "THE OBSERVER",
-    hp: 200,
+    hp: 100,
     energy: 2,
-    draw: 3,
+    draw: 5,
     strength: 0,
     subtitle: "看见，才能理解。",
-    description: "坚韧壁垒：200 生命；每回合 2 能量、抽 3 张。专属卡治疗、格挡与反击；遗物“重置”每幕一次回满生命，未用额度过幕存成 Banked Reset 重置卡。",
+    description: `稳守反击：100 生命；每回合 2 能量、抽 5 张。起始牌组含 6 张攻击；专属卡提供有限治疗与格挡。遗物“重置”每幕一次回复 ${RESET_HEAL} 生命，未用额度过幕存成 Banked Reset 重置卡。`,
     relic: "reset",
     signature: "mend",
-    starterDeck: ["strike", "strike", "strike", "defend", "defend", "defend", "observe", "mend", "bulwark", "guard-strike"],
+    starterDeck: ["strike", "strike", "strike", "strike", "strike", "defend", "defend", "observe", "mend", "guard-strike"],
     color: "#91d4ac",
   },
   {
@@ -83,11 +84,11 @@ export const CHARACTERS: Character[] = [
     name: "织忆者",
     english: "THE ARCHIVIST",
     hp: 68,
-    energy: 6,
+    energy: 5,
     draw: 8,
     strength: 0,
     subtitle: "让经验，在时间里生长。",
-    description: "疾速连奏：68 生命；每回合 6 能量、抽 8 张，首回合多抽 1 张。零费快攻、三段连击与抽牌衔接；记忆丝线每打出 3 张牌额外抽 1 张。",
+    description: "择机连奏：68 生命；每回合 5 能量、抽 8 张，首回合多抽 1 张。用零费快攻衔接三段连击；记忆丝线每回合打出第 3 张牌时额外抽 1 张，每回合一次。",
     relic: "thread",
     signature: "flurry",
     starterDeck: ["quick-strike", "quick-strike", "quick-strike", "defend", "defend", "quick-step", "quick-step", "observe", "flurry", "hybrid"],
@@ -117,13 +118,13 @@ export const RELICS = {
     character: "weaver",
     name: "记忆丝线",
     icon: "layers",
-    description: "织忆者专属。首回合多抽 1 张；每回合每打出 3 张牌，额外抽 1 张。",
+    description: "织忆者专属。首回合多抽 1 张；每回合打出第 3 张牌时，额外抽 1 张，每回合一次。",
   },
   reset: {
     character: "scholar",
     name: "重置",
     icon: "cycle",
-    description: "观测者专属。每幕可主动使用一次：回复全部生命。未用额度过幕存为一张 Banked Reset 重置卡（最多持有一张），新幕恢复一次额度。",
+    description: `观测者专属。每幕可主动使用一次：回复 ${RESET_HEAL} 点生命，不超过生命上限。未用额度过幕存为一张 Banked Reset 重置卡（最多持有一张），新幕恢复一次额度。`,
   },
   prism: { name: "观测棱镜", icon: "eye", description: "每回合抽牌数增加 1。" },
   battery: {
@@ -432,9 +433,9 @@ export const CARDS: CardDef[] = [
   c("heavy-strike", "全力执行", "HEAVY STRIKE", "attack", 2, "aci", "sword", { character: "engineer", damage: 24 }, "uncommon"),
   c("overdrive", "执行蓄势", "OVERDRIVE", "skill", 1, "constraints", "flame", { character: "engineer", strength: 4, exhaust: true }),
   c("meteor", "终局交付", "FINAL DELIVERY", "attack", 3, "evaluation", "target", { character: "engineer", damage: 42, exhaust: true }, "rare"),
-  c("mend", "状态修复", "MEND", "skill", 1, "recovery", "cycle", { character: "scholar", block: 8, heal: 8, exhaust: true }),
-  c("bulwark", "持久防线", "BULWARK", "skill", 2, "isolation", "shield", { character: "scholar", block: 24 }, "uncommon"),
-  c("guard-strike", "稳态反击", "GUARD STRIKE", "attack", 1, "harness", "shield", { character: "scholar", damage: 6, block: 8 }),
+  c("mend", "状态修复", "MEND", "skill", 1, "recovery", "cycle", { character: "scholar", block: 5, heal: 4, exhaust: true }),
+  c("bulwark", "持久防线", "BULWARK", "skill", 2, "isolation", "shield", { character: "scholar", block: 16 }, "uncommon"),
+  c("guard-strike", "稳态反击", "GUARD STRIKE", "attack", 1, "harness", "shield", { character: "scholar", damage: 6, block: 5 }),
   c("banked-reset", "重置卡", "BANKED RESET", "skill", 1, "recovery", "cycle", { character: "scholar", special: "reset", retain: true, exhaust: true, purge: true, generatedOnly: true }, "rare"),
 ];
 for (const card of CARDS) card.character ??= CARD_OWNERS[card.id];
@@ -493,7 +494,7 @@ export function cardText(card: Card, strength = 0, weak = 0): string {
   if (d.special === "cache") text.push("此后每回合获得 1 点额外能量");
   if (d.special === "retention") text.push("此后每回合保留至多 8 点格挡");
   if (d.special === "cleanse") text.push("清除自身虚弱和易伤");
-  if (d.special === "reset") text.push("回复全部生命");
+  if (d.special === "reset") text.push(`回复 ${RESET_HEAL} 点生命`);
   if (d.retain) text.push("保留：回合结束不弃置");
   if (d.exhaust) text.push("消耗");
   if (d.purge) text.push("使用后永久移出牌组");

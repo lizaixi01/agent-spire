@@ -84,6 +84,7 @@ async function autoRun(
   character: CharacterId,
   seed: number,
   applyKnowledge = true,
+  combatPolicy: "priority" | "leftmost" = "priority",
 ): Promise<Run> {
   let run = createRun(character, seed);
   for (let step = 0; step < 2500; step++) {
@@ -149,12 +150,14 @@ async function autoRun(
           run = usePotion(run, fire, target.id);
           break;
         }
-        const options = run
-          .battle!.hand.map((c) => ({ card: c, score: score(c, run) }))
-          .sort((a, b) => b.score - a.score);
-        if (options[0]?.score > 0)
-          run = playCard(run, options[0].card.uid, target.id);
-        else run = endTurn(run);
+        if (combatPolicy === "leftmost") {
+          const card = run.battle!.hand.find(c => statsFor(c).cost <= run.player.energy);
+          run = card ? playCard(run, card.uid, target.id) : endTurn(run);
+        } else {
+          const options = run.battle!.hand.map(c => ({ card: c, score: score(c, run) }))
+            .sort((a, b) => b.score - a.score);
+          run = options[0]?.score > 0 ? playCard(run, options[0].card.uid, target.id) : endTurn(run);
+        }
         break;
       }
       case "reward": {
@@ -251,5 +254,11 @@ describe("完整远征回归", () => {
         `${character} should have a viable complete route`,
       ).toBeGreaterThan(0);
     }
+    let leftmostWins = 0;
+    for (let seed = 1; seed <= 10; seed++)
+      if ((await autoRun("weaver", seed, true, "leftmost")).screen === "victory") leftmostWins++;
+    console.info(`织忆者固定十种子：按意图选牌 ${victories.weaver} 胜；最左可用牌 ${leftmostWins} 胜。`);
+    expect(leftmostWins, "忽略敌人意图的最左出牌不应与有选择的策略一样稳定").toBeLessThan(victories.weaver);
+    expect(leftmostWins, "固定十种子中，盲点最左牌不能仍有九成通关").toBeLessThanOrEqual(5);
   }, 120000);
 });

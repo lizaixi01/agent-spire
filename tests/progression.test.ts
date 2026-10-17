@@ -86,7 +86,7 @@ describe("远征中的成长与学习", () => {
     const run = room("rest");
     run.player.hp = 20;
     const healed = rest(run, "heal");
-    expect(healed.player.hp).toBe(80);
+    expect(healed.player.hp).toBe(50);
     expect(rest(healed, "heal")).toEqual(healed);
     const upgraded = rest(run, "upgrade", run.deck[0].uid);
     expect(upgraded.deck.filter((c) => c.upgraded)).toHaveLength(1);
@@ -117,7 +117,7 @@ describe("远征中的成长与学习", () => {
     const run = room("event");
     expect(resolveEvent(run, "study").screen).toBe("quiz");
     const risk = resolveEvent(run, "risk");
-    expect(risk.player.hp).toBe(192);
+    expect(risk.player.hp).toBe(92);
     expect(risk.player.gold).toBe(144);
     run.player.hp = 3;
     expect(resolveEvent(run, "risk").screen).toBe("defeat");

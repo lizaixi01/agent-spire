@@ -38,7 +38,11 @@
 
 ### 下载离线游玩
 
-1. 从 [Releases](https://github.com/lizaixi01/agent-spire/releases/latest) 下载 **`agent-spire-v0.1.2-play.zip`**，解压整个文件夹。请选择 `-play.zip`；GitHub 自动生成的 Source code 是开发源码。
+<!-- release-version:start -->
+当前版本 **v0.1.3** · 游玩包 **`agent-spire-v0.1.3-play.zip`** · [在线体验](https://lizaixi01.github.io/agent-spire/) · [下载与精确体积](https://github.com/lizaixi01/agent-spire/releases/latest)
+<!-- release-version:end -->
+
+1. 从 [Releases](https://github.com/lizaixi01/agent-spire/releases/latest) 下载上述 **`-play.zip`**，解压整个文件夹。GitHub 自动生成的 Source code 是开发源码。
 2. 安装 [Node.js](https://nodejs.org/) 22.12+，也兼容 20.19+。
 3. **Windows：**双击 `启动游戏.cmd`。**macOS / Linux：**在解压目录运行 `node scripts/serve-game.mjs`，打开 <http://127.0.0.1:4173/>。
 
@@ -46,7 +50,7 @@
 
 ### 下载有多轻
 
-当前 v0.1.2 游玩 ZIP 约 **7.3 MiB**，发布设置 **10 MiB 上限**。只打包游戏、三张使用中的图片、中文像素字体与许可、零依赖启动器；不附带 Node.js、`node_modules`、测试截图、教材 PDF 或停用素材。校验值见附件 `SHA256SUMS.txt`，版本、提交与精确体积见 `RELEASE-MANIFEST.json`。
+游玩 ZIP 设置 **10 MiB 硬上限**，精确体积自动写入每版 Release 说明和清单。只打包游戏、三张使用中的图片、中文像素字体与许可、零依赖启动器；不附带 Node.js、`node_modules`、测试截图、教材 PDF 或停用素材。校验值见附件 `SHA256SUMS.txt`，版本、提交与精确体积见 `RELEASE-MANIFEST.json`。
 
 在线版的 [构建信息](https://lizaixi01.github.io/agent-spire/build-info.json) 与游玩包内 `dist/build-info.json` 可核对版本和 Git 提交；正式发布的 `uncommitted` 应为 `false`。同一版源码、在线版和下载包使用同一个提交。
 
@@ -62,9 +66,9 @@ git clone --depth 1 https://github.com/lizaixi01/agent-spire.git
 
 | 角色 | 构筑方向 |
 | --- | --- |
-| 绿色观测者 | 高生命、防御与回复，每幕一次主动重置 |
+| 绿色观测者 | 100 生命、稳守反击，每幕一次重置回复 30 |
 | 橙色铸序师 | 力量、多段攻击与高费爆发 |
-| 蓝色织忆者 | 高能量、抽牌与连续出牌 |
+| 蓝色织忆者 | 5 能量、大手牌与择机连奏，丝线每回合触发一次 |
 
 | 操作 | 方法 |
 | --- | --- |
@@ -114,7 +118,10 @@ npm run build         # 生成 dist/
 npm run build:pages   # 生成 GitHub Pages 网页版 dist-pages/
 npm start             # 本地运行构建结果，默认 4173
 npm run release:pack  # 构建、打包并检查 10 MiB 体积上限
+npm run release       # 一键升版、测试、同步源码 / Pages / 下载包（维护者）
 ```
+
+维护者在 `main` 完成本地修改后运行 `npm run release`，Windows 也可双击 `发布更新.cmd`。默认递增补丁版本，并同步 lockfile、界面版本和 README 下载入口。需要已登录且有仓库写权限的 GitHub CLI；首次使用或恢复失败时见 [一键发布说明](docs/RELEASING.md)。
 
 | 路径 | 用途 |
 | --- | --- |

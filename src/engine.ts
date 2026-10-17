@@ -2,6 +2,7 @@ import {
   CARDS,
   CARD_BY_ID,
   CHARACTERS,
+  RESET_HEAL,
   statsFor,
   isCardForCharacter,
   canAcquireCard,
@@ -83,7 +84,7 @@ export interface Battle {
   log: string[];
   room: RoomKind;
   sequence?: string[];
-  lab?: { caseId: string; choice: number | null; transfer: number | null; order?: number[]; transferOrder?: number[]; beginnerTransfer?: boolean };
+  lab?: { caseId: string; choice: number | null; transfer: number | null; order?: number[]; transferOrder?: number[]; beginnerTransfer?: boolean; followUpVersion?: 1 };
   enemyActions?: EnemyAction[];
   attackHits?: AttackHit[];
   cardsPlayed?: number;
@@ -393,6 +394,7 @@ function startBattle(run: Run, node: MapNode): void {
     transfer: null,
     order: shuffle(run,[0,1,2]),
     transferOrder: shuffle(run,[0,1,2]),
+    followUpVersion: 1,
   };
   run.encounteredCases = [...(run.encounteredCases ?? []), run.battle.lab.caseId];
   if (run.player.relics.includes("seal")) run.player.block += 3;
@@ -500,10 +502,10 @@ export function useReset(input: Run): Run {
       input.player.resetCharges !== 1 || input.player.hp <= 0 || input.player.hp >= input.player.maxHp) return input;
   const run = clone(input);
   run.player.resetCharges = 0;
-  heal(run, run.player.maxHp);
+  heal(run, RESET_HEAL);
   run.battle!.enemyActions = [];
   run.battle!.attackHits = [];
-  addLog(run, "重置：回复全部生命，本幕额度已用完。");
+  addLog(run, `重置：回复至多 ${RESET_HEAL} 点生命，本幕额度已用完。`);
   return run;
 }
 export function burstBonus(run: Run, card: Card): number {
@@ -562,7 +564,7 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
   p.energy += (d.energy ?? 0) + synergy.energy;
   if (d.strength) p.strength += d.strength;
   if (d.heal) heal(run, d.heal);
-  if (d.special === "reset") heal(run, p.maxHp);
+  if (d.special === "reset") heal(run, RESET_HEAL);
   if (d.weak) enemy.weak += d.weak;
   if (d.vulnerable) enemy.vulnerable += d.vulnerable;
   if (d.poison) enemy.poison += d.poison;
@@ -576,7 +578,7 @@ export function playCard(input: Run, uid: string, targetId?: string): Run {
   // Draw before discarding the played card: it cannot immediately draw itself.
   if (d.draw || synergy.draw || bossDraw) draw(run, (d.draw ?? 0) + synergy.draw + bossDraw);
   battle.cardsPlayed = (battle.cardsPlayed ?? 0) + 1;
-  if (hasRelic(run, "thread") && battle.cardsPlayed % 3 === 0) {
+  if (hasRelic(run, "thread") && battle.cardsPlayed === 3) {
     draw(run, 1);
     addLog(run, "记忆丝线：三牌连奏，额外抽 1 张。");
   }
@@ -683,6 +685,7 @@ export function answerLab(input: Run, choice: number): Run {
   });
   run.battle!.enemyActions = [];
   run.battle!.attackHits = [];
+  if (scenario.level === "beginner") lab.followUpVersion = 1;
   if (lab.choice === null) {
     lab.choice = choice;
     if (choice === scenario.correct) {

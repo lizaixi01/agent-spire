@@ -1,48 +1,66 @@
-# 发布维护
+# 一键发布
 
-首次发布使用当前 GitHub 账号 lizaixi01 的公开仓库 agent-spire。安装依赖、构建产物、本地截图集合、教材文本及历史素材不进入 Git；仅 README 用的两张截图保留于 docs/images/。
-
-## 验证和打包
+维护者完成所有本地功能修改后，在 `main` 运行：
 
 ```sh
-npm ci
-npm test
-npm run check
-npm run release:pack
+npm run release
 ```
 
-Python 3 标准库打包 dist/、Windows 启动器、Node 静态服务器与游玩/资源说明。ZIP 最大 10 MiB，超出会失败并删除不合格 ZIP。字体及其上游许可原样进入 dist/ 和 ZIP。SHA256SUMS.txt 用于校验传输完整性，不作为签名。
+Windows 也可双击仓库根目录的 `发布更新.cmd`；窗口会保留结果供查看。
 
-解压到独立目录，验证其中没有 node_modules；使用 `node scripts/serve-game.mjs 4183` 并检查首页、脚本、CSS、图片、字体均能加载。Windows 另验证 `scripts/start-game.ps1 -Port 4183 -NoBrowser`。服务器只监听 127.0.0.1，并拒绝目录越界与写入请求。
+需要 Node.js 22.12+（也兼容 20.19+）、npm、Python 3.10+、Git 和已登录的 GitHub CLI（`gh auth login`），以及 `lizaixi01/agent-spire` 的源码、Actions、Release 和 Pages 权限。仓库 Pages 来源为 GitHub Actions。执行期间保持终端和网络连接；命令会等待云端验证与部署，通常需要数分钟。新机器先运行 `npm ci`。
 
-## GitHub Release
+## 自动执行的步骤
 
-更新 package.json 版本并同步 package-lock.json；提交、推送并确认 Checks 成功后，再用相同版本创建 tag 和 Release。上传 release/ 下的游玩 ZIP 与 SHA256SUMS.txt。发布说明写明包大小、Node.js 前置要求与验证结果。不要上传包含 node_modules 的整个目录。
+1. 检查当前分支、origin、登录状态与远端历史；远端有本地尚未合并的提交时停止。
+2. 默认将补丁版本加一，同步 `package.json`、lockfile 根包版本及 README 标记区中的版本、下载文件名和入口。游戏界面直接读取包版本。功能介绍、截图等人工内容保持原样；本次功能说明应在发布前更新。
+3. 将源码快照复制到临时目录，安装锁定依赖，运行完整游戏测试与发布工具回归、TypeScript 检查、离线构建打包和 Pages 构建；结束后清理临时目录，不重装开发目录的依赖，避免 Windows 开发服务锁定 esbuild。ZIP 超过 **10 MiB** 立即失败。每一步后核对原目录文件指纹；其他窗口期间新增、修改或删除文件时停止，恢复后重新测试。
+4. 将所有已跟踪及未被 Git 忽略的本地修改加入一个发布提交并推送 `main`，包含之前已有的本地提交。发布前请检查 `git status`，确保这些文件都应公开；不要在检查期间继续编辑。
+5. 等待该提交的 `Checks` 测试、双构建和 Pages 部署全部成功，下载该运行唯一的 `player-package` 产物。正式附件使用干净的 CI 构建，不使用本机测试时生成的脏构建。
+6. 校验 ZIP 完整性、包体积、清单、SHA256、主分支及公网 Pages 的版本与提交，然后创建同提交标签和草稿 Release，上传 ZIP、校验文件及清单。附件存在且哈希相同时复用，任何不同均停止，绝不覆盖旧版。
+7. 发布 Release，再核对最新 Release 的三个附件哈希、标签、main、在线信息和 ZIP 身份；成功后将相同附件复制到本机 `release/`，保存完成状态并打印下载链接。
 
-CI 在每次推送及 PR 执行测试、类型检查、构建与体积检查，失败时查看 Actions 日志；修复后重新推送。Release 附件由维护者在验证完成后上传。
+```sh
+npm run release -- --dry-run          # 只读预检，显示下一个版本；fetch 更新远端引用
+npm run release -- --version minor    # 例如 0.1.3 → 0.2.0
+npm run release -- --version 1.0.0    # 显式稳定版本，必须递增
+npm run release -- --resume           # 失败或断线后继续同一版本
+```
 
-历史素材留在本机 reference/unpublished-assets/，不会随源码下载。src/style.css 的历史背景引用统一指向仍在使用的 pixel/spire.png，避免构建重新收录旧背景。
+每次准备发布时执行一次。普通 push 仍触发 CI 与 main 的 Pages 部署，但不会创建 Release；需要三处统一版本时使用上述命令。脚本只在三处最终核对通过后报告成功。
 
-## GitHub Pages 在线体验
+## 失败与恢复
 
-访问 https://lizaixi01.github.io/agent-spire/ 即可在浏览器游玩，无需安装 Node.js。在线版需要网络加载资源；下载包继续用于本地离线游玩。
+进度自动保存在被 Git 忽略的 `output/release-state.json`。未完成发布时再次直接运行会停止，避免重复升版；使用 `--resume`。操作系统文件锁阻止重复启动发布进程，进程退出或崩溃会自动解锁，不必手动删除锁文件。
 
-`npm run build:pages` 单独生成 dist-pages/，Vite 将脚本、CSS、图片、字体及图标的路径统一加上 /agent-spire/ 前缀。该目录被 Git 忽略，不影响下载包的 dist/ 与根路径。
+- **本地测试失败或文件并发写入：**修复并完成修改，再恢复；会对同一目标版本重新执行所有本地检查，不推送失败快照。
+- **准备阶段合入了远端更新：**尚未创建发布提交时，恢复可跟随从旧基线前进的合并或快进，自动重跑全部本地检查；不会沿用旧测试结果。已被发布占用或落后的目标版本会被拒绝。
+- **推送失败：**恢复时复用已提交版本；不强推。若远端出现新提交或 HEAD 被改动，先检查历史并协调当前发布范围，脚本会拒绝继续旧快照。
+- **Actions 失败：**使用 `gh run view <run> --log-failed` 排查。环境偶发故障可 `gh run rerun <run> --failed`，再恢复。源码错误需修复并走新的提交及版本，不能将旧产物贴到新提交上。
+- **部署完成但公网信息未更新：**自动重试六次，仍不一致则停止；确认 Pages 后恢复。
+- **附件上传或网络中断：**恢复时重新下载同一 CI 产物，复用匹配的标签与草稿，补传缺失附件，不覆盖已有内容。CI 产物过期时重新运行同一个提交的原 Actions run，再恢复。
+- **取消或必须改换版本：**先检查是否已推送、是否已有标签或 Release，保留状态作为记录。未推送的准备状态可移走状态文件并自行撤回自动版本修改后重来；已有远端记录时勿删除或挪用其版本。修复后用新的递增版本发布，并归档旧状态。极少数在 Git 提交成功但保存状态前进程被强制终止的情况，需人工核对 HEAD 与状态后恢复，勿重复提交或覆盖标签。
 
-仓库 Pages 来源设置为 GitHub Actions。Checks 工作流在测试、类型检查、下载体积检查和网页构建通过后上传 Pages 产物；只有 main 的非 PR 运行可部署到 github-pages 环境。失败时查看 Actions 日志，修复后重新推送或手动运行工作流；需要回退时恢复已验证提交再部署。现有站点在新部署失败时继续提供上一版本。
+脚本不自动回滚已推送源码、已部署 Pages 或已发布 Release。多服务无法原子更新，失败时可能短暂不同步；失败会明确退出，恢复并通过最终核对才算完成。发布期间不要从其他窗口推送 main。GitHub 并发规则会取消同 ref 的旧 CI；被取消运行不会用于发布。
 
-在线版和本地版属于不同站点，存档各自保存在当前浏览器，不会自动同步。GitHub Pages 上同一域名的其他项目共享浏览器 origin，后续项目应避免复用本游戏的存档键。
+## 轻量包与版本约定
 
-部署后检查首页、全部静态资源及字体无 404，实际走通选角、进入战斗、作答、出牌、刷新恢复，并检查手机布局。自动构建成功不等于在线验收完成。
+`scripts/package-release.py` 只打包 `dist/`、Windows 启动器、零依赖 Node 静态服务器与游玩/资源说明；保留字体及上游许可。Node.js、`node_modules`、测试、源码、教材和历史素材不进入游玩 ZIP。10 MiB 为硬上限，超出即删除不合格 ZIP。发布工具、测试与状态均不进入游玩包。SHA256 用于完整性检查，不是签名。
 
-## 版本一致性约定
+两个构建入口运行 `scripts/build-info.mjs`，将版本、完整 Git 提交与未提交状态写入忽略的 `public/build-info.json`，再进入构建目录。无 Git 的源码归档身份为 `null`；正式包必须为已知提交且 `uncommitted=false`。Pages 的 `dist-pages/` 使用 `/agent-spire/` 前缀，下载包的 `dist/` 使用本地路径。两者的浏览器存档分别保存。
 
-每次统一发布递增 package.json 与 lockfile 版本；界面版本号直接读取 package.json，避免手工维护第二份版本。两个构建入口均运行 scripts/build-info.mjs，将版本、完整 Git 提交和未提交状态写入忽略的 public/build-info.json，再进入各自构建目录。无 Git 的源码 ZIP 可正常构建，提交与未提交状态明确为 null，不冒充已知提交。
+README 的 `<!-- release-version:start -->` / `<!-- release-version:end -->` 区块由脚本维护，请保留标记。精确包大小写入 Release 说明和 `RELEASE-MANIFEST.json`，避免把构建结果再写回源码造成提交身份循环。
 
-发布前先提交并通过全量测试、网页与游玩包浏览器验收。最后等待该提交的 CI 和 Pages 部署通过，下载同一运行的 player-package 构建产物作为发布附件，再创建指向同一提交的版本标签及 Release。避免本地其他窗口的后续写入混进构建。上传游玩 ZIP、SHA256SUMS.txt、RELEASE-MANIFEST.json；清单自动记录版本、提交、精确字节和 ZIP 哈希。旧版附件保留在原 Release。
+可独立核对正式发布：
 
-Checks 针对同一个 ref 取消旧运行，避免较早提交的慢构建在新提交后覆盖 Pages。
+```sh
+python scripts/verify-release.py --directory release
+```
 
-完成条件：GitHub main、标签、在线 build-info.json、ZIP 内 dist/build-info.json 与 RELEASE-MANIFEST.json 的提交和版本一致，uncommitted=false，远端附件哈希匹配本地；README 的版本与下载入口一致。仅看文件名或部署成功不能证明版本已同步。
+完成条件为 main、版本标签、最新 Release、在线 `build-info.json`、ZIP 内信息与清单的提交和版本一致，三个远端附件哈希匹配，ZIP 不超过 10 MiB。此命令需要 gh 和公网 HTTPS。
 
-发布后运行 `python scripts/verify-release.py --directory <下载的构建产物目录>`。此检查使用已登录的 gh 和公网 HTTPS，核对主分支、版本标签、最新 Release、在线构建信息、包内信息、上传哈希、校验文件和 10 MiB 限制；任意不一致均失败。
+## 人工验收与独立打包
+
+开发时仅构建轻量包用 `npm run release:pack`，不推送、不发布。打包后自动解压实际 ZIP，在随机本机端口启动包内零依赖服务器，核对首页与每个游戏资源的响应字节，检查完成后关闭该进程。`npm test` 包括游戏行为及发布工具失败恢复测试。CI 与一键发布均执行这些检查。
+
+界面或玩法改动还应在发布前实际走通选角、战斗、作答、出牌、刷新恢复及手机布局，并检查图片、字体和静态资源无 404；自动构建与版本一致性检查不能替代视觉和交互验收。独立解压包后可运行 `node scripts/serve-game.mjs 4183`，Windows 可运行 `scripts/start-game.ps1 -Port 4183 -NoBrowser`。服务仅监听 127.0.0.1。

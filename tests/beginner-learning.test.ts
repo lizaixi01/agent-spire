@@ -62,6 +62,32 @@ describe("零基础入门主线", () => {
       expect(decodeRun(encodeRun(quiz))).toEqual(quiz);
     }
   });
+  it("巩固题换新后，已答旧档保留旧题与乱序答案；未答阶段使用新题并持久化版本", () => {
+    const base = chapterRun("scholar", 42);
+    const old = enterNode(base, availableNodes(base)[0].id);
+    const parent = BEGINNER_QUESTIONS.find(q => q.id === "intro-react-feedback")!;
+    const former = BEGINNER_QUESTIONS.find(q => q.id === "intro-react-error")!;
+    old.battle!.lab = { caseId: `beginner-${parent.id}`, choice: 0, transfer: 0,
+      order: [0, 1, 2], transferOrder: [2, 0, 1] };
+    const restored = decodeRun(encodeRun(old))!;
+    const originalTransfer = transferFor(caseForBattle(restored));
+    expect(originalTransfer.question).toBe(former.question);
+    expect(originalTransfer.correct).toBe(0);
+    expect(originalTransfer.options[0]).toBe(former.options[former.correct]);
+    expect(restored.player).toEqual(old.player);
+    expect(decodeRun(encodeRun(restored))).toEqual(restored);
+
+    old.battle!.lab!.transfer = null;
+    const pending = decodeRun(encodeRun(old))!;
+    const newTransfer = transferFor(caseForBattle(pending));
+    expect(newTransfer.question).toBe(BEGINNER_FOLLOW_UPS[parent.id].question);
+    const done = answerLab(pending, newTransfer.correct);
+    expect(done.battle!.lab!.followUpVersion).toBe(1);
+    expect(transferFor(caseForBattle(decodeRun(encodeRun(done))!))).toEqual(newTransfer);
+    const malformed = structuredClone(done);
+    Object.assign(malformed.battle!.lab!, { followUpVersion: 2 });
+    expect(decodeRun(encodeRun(malformed))).toBeNull();
+  });
   it("旧试炼只替换未答部分，已答题、成绩、资源与随机状态保持原样", () => {
     const run=chapterRun("scholar",42,3), original=ENGINEERING_TRIALS[0].questions[0];
     run.screen="quiz";
